@@ -1,113 +1,99 @@
 <template>
-  <div class="video-container">
-    <video autoplay loop muted playsinline disablePictureInPicture class="video-background">
-      <source src="./assets/Stars.mp4" type="video/mp4" />
-    </video>
-    <div class="content">
-      <h1 class="title">
-        <span class="neon-orange">Can</span>
-        <img src="/canfusion_logo.svg" alt="Logo" class="logo-img" />
-        <span class="electric-blue">Fusion</span>
-      </h1>
-    </div>
+  <div class="app-container">
+    <video class="background-video" src="/Stars.mp4" autoplay loop muted></video>
+    
+    <header class="fixed-header">
+      <div class="header-inner">
+        <!-- Left-aligned Branding -->
+        <div class="brand-container">
+          <img src="/canfusion_logo.svg" alt="CanFusion Logo" class="brand-logo" />
+          <span class="brand-text">CanFusion</span>
+        </div>
+        
+        <!-- Right-aligned Navigation -->
+        <nav class="desktop-navigation">
+          <div class="nav-links-container">
+            <a href="" class="navigation-link">Misija</a>
+            <a href="" class="navigation-link">Projekto progresas</a>
+            <a href="" class="navigation-link">Apie mus</a>
+            <a href="/galerija" class="navigation-link">Galerija</a>
+          </div>
+        </nav>
+      </div>
+    </header>
   </div>
 </template>
 
-<script setup>
-// Add any setup logic here if needed
-</script>
-
 <style scoped>
-/* Background video container */
-.video-container {
+/* Previous root and container styles remain the same */
+
+.fixed-header {
   position: fixed;
   top: 0;
   left: 0;
+  width: 100vw;
+  height: clamp(4rem, 8vh, 6rem);
+  background-color: white;
+  box-shadow: 0 0.2vh 0.4vh -0.1vh rgba(0, 0, 0, 0.1), 
+              0 0.1vh 0.2vh -0.2vh rgba(0, 0, 0, 0.1);
+  z-index: 50;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 clamp(1rem, 3vw, 2rem);
   width: 100%;
-  height: 100%;
-  overflow: hidden;
 }
 
-/* Background video styling */
-.video-background {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  min-width: 100%;
-  min-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: cover;
-  z-index: -1;
-}
-
-/* Content styling */
-.content {
-  position: relative;
-  z-index: 10;
-  color: white;
-  text-align: center;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-}
-
-/* Title styling */
-.title {
+.brand-container {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 7vw; /* Increased size */
-  font-weight: bold;
-  margin: 0;
+  gap: clamp(0.5rem, 1vw, 1rem);
 }
 
-/* Logo image styling */
-.logo-img {
-  height: 15vw;
+.desktop-navigation {
+  display: none; /* Hidden by default */
+}
+
+.nav-links-container {
+  display: flex;
+  gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+/* Show navigation on desktop */
+@media (min-width: 768px) {
+  .desktop-navigation {
+    display: flex; /* Changed from block to flex */
+    justify-content: flex-end;
+  }
+}
+
+/* Rest of the styles remain the same */
+.navigation-link {
+  color: #1f2937;
+  font-weight: 500;
+  font-size: clamp(1.2rem, 1.8vw, 1.8rem);
+  line-height: clamp(1.8rem, 2.5vw, 2.5rem);
+  transition: color 0.2s ease;
+}
+
+.navigation-link:hover {
+  color: #2563eb;
+}
+
+.brand-logo {
+  height: clamp(3rem, 6vh, 5rem);
   width: auto;
-  margin: 0 1.5rem;
-  filter: 
-    drop-shadow(-0.8vw 0 0.6vw rgba(255, 71, 0, 0.8))  /* Orange core glow */
-    drop-shadow(0.8vw 0 0.6vw rgba(0, 180, 255, 0.7))   /* Blue core glow */
 }
 
-
-/* Electric blue text styling */
-.electric-blue {
-  color: #00FFFF; /* Cyan base color */
-  text-shadow: 
-    0 0 10px #00FFFF, 
-    0 0 20px #1E90FF, 
-    0 0 30px #4682B4, 
-    0 0 40px #00FFFF; /* Bright and soft layers for depth */
-}
-
-/* Neon purple text styling */
-.neon-purple {
-  color: #8a2be2;
-  text-shadow: 0 0 15px #8a2be2, 0 0 25px #6a0dad;
-}
-
-.neon-orange {
-  color: #FFA500; /* Bright orange base color */
-  text-shadow: 
-    0 0 10px #FFA500, 
-    0 0 20px #FF8C00, 
-    0 0 30px #FF4500, 
-    0 0 40px #FF6347; /* Add layers of glowing effect */
-}
-
-/* Responsiveness for smaller screens */
-@media (max-width: 768px) {
-  .title {
-    font-size: 10vw; /* Larger text for smaller screens */
-  }
-
-  .logo-img {
-    height: 20vw; /* Larger logo for smaller screens */
-  }
+.brand-text {
+  color: #2563eb;
+  font-weight: 700;
+  font-size: clamp(1.8rem, 3vw, 3rem);
+  line-height: clamp(2.2rem, 3.5vw, 3.5rem);
+  letter-spacing: -0.05vw;
 }
 </style>
