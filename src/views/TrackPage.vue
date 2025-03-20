@@ -35,6 +35,19 @@ onMounted(async () => {
     // Use the global Cesium object
     const Cesium = window.Cesium;
     
+    // Set Cesium Ion token from environment variables
+    try {
+      const cesiumToken = import.meta.env.VITE_CESIUM_TOKEN;
+      if (cesiumToken) {
+        Cesium.Ion.defaultAccessToken = cesiumToken;
+        console.log('Cesium Ion token set successfully');
+      } else {
+        console.warn('No Cesium Ion token found in environment variables');
+      }
+    } catch (tokenErr) {
+      console.warn('Error setting Cesium Ion token:', tokenErr);
+    }
+    
     // Create a very simple viewer
     viewer = new Cesium.Viewer('cesiumContainer', {
       baseLayerPicker: true,
