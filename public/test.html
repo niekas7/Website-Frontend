@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cesium Test</title>
+  <link href="/cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .back-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 999;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 12px 18px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      color: white;
+      text-decoration: none;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <a href="/" class="back-btn">← Grįžti</a>
+  
+  <script src="/cesium/Cesium.js"></script>
+  
+  <script>
+    // Set your token
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMWFjYmFkNjc5YzciLCJpZCI6NzIzNTMsImlhdCI6MTYzNjM2Nzc3Mn0.XcKpgANiY22ZbOOc7yKMo9XNPKfLhAOQ3Ruy8v4MBGM';
+
+    // Initialize the viewer
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      animation: false,
+      baseLayerPicker: false,
+      fullscreenButton: false,
+      geocoder: false,
+      homeButton: false,
+      infoBox: false,
+      sceneModePicker: false,
+      selectionIndicator: false,
+      timeline: false,
+      navigationHelpButton: false
+    });
+    
+    // Add a point
+    viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(23.9595, 54.9043),
+      point: {
+        pixelSize: 10,
+        color: Cesium.Color.BLUE
+      },
+      label: {
+        text: 'KTU',
+        font: '14pt sans-serif',
+        fillColor: Cesium.Color.WHITE,
+        pixelOffset: new Cesium.Cartesian2(0, -10)
+      }
+    });
+    
+    // Fly to Lithuania
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(23.8813, 55.1694, 500000)
+    });
+  </script>
+</body>
+</html> 

@@ -1,15 +1,40 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/canfusion_logo.svg" />
+  <link rel="icon" href="/Canfusion_logo.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CanFusion</title>
+  <!-- Include Cesium CSS directly -->
+  <link href="/cesium/Widgets/widgets.css" rel="stylesheet" />
+  <style>
+    /* Ensure full height for the body */
+    html, body, #app {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
+  <!-- Load Cesium first, before Vue -->
+  <script src="/cesium/Cesium.js"></script>
 </head>
 
 <body>
   <div id="app"></div>
+  <script>
+    // Configure Cesium base URL and token
+    window.CESIUM_BASE_URL = '/cesium';
+    
+    // Set your token globally
+    window.CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI0NzU2Mjc3NS1iNmIwLTRiODAtODI3Ni01MzM2ZmMzYTE2YWMiLCJpZCI6Mjg2MTU4LCJpYXQiOjE3NDI0OTA1MDZ9.T_NaLfVGMt5gItoV0EbnYKYaYQD5UFkwIN6b1nyqqz4';
+    
+    // Set Ion token immediately
+    if (window.Cesium && window.Cesium.Ion) {
+      window.Cesium.Ion.defaultAccessToken = window.CESIUM_TOKEN;
+    }
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 

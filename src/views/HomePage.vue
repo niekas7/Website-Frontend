@@ -1,0 +1,566 @@
+<template>
+  <div class="whole-page">
+    <div class="app-container">
+      <video 
+        class="background-video" 
+        src="/Stars.mp4" 
+        autoplay 
+        loop 
+        muted 
+        playsinline
+        disablepictureinpicture
+        controlslist="nodownload nofullscreen noremoteplayback"
+        disableremoteplayback
+      ></video>
+
+      <!-- Header -->
+      <header class="header">
+        <div class="header-inner">
+          <div class="brand">
+            <img src="/Canfusion_logo.svg" alt="Logo" class="logo" />
+            <span class="brand-name">CanFusion</span>
+          </div>
+
+          <nav class="desktop-nav">
+            <a href="#hero" class="nav-link">Misija</a>
+            <a href="" class="nav-link">Projekto progresas</a>
+            <a href="#bio-section" class="nav-link">Apie mus</a>
+            <a href="/galerija" class="nav-link">Galerija</a>
+            <router-link to="/track" class="nav-link">Žemėlapis</router-link>
+          </nav>
+
+          <button class="menu-toggle" @click="toggleMenu">
+            <svg v-if="!menuOpen" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Mobile menu -->
+      <transition name="menu-transition">
+        <div v-if="menuOpen" class="mobile-menu">
+          <a href="#hero" class="nav-link" @click="closeMenu">Misija</a>
+          <a href="" class="nav-link" @click="closeMenu">Projekto progresas</a>
+          <a href="#bio-section" class="nav-link" @click="closeMenu">Apie mus</a>
+          <a href="/galerija" class="nav-link" @click="closeMenu">Galerija</a>
+          <router-link to="/track" class="nav-link" @click="closeMenu">Žemėlapis</router-link>
+        </div>
+      </transition>
+
+      <!-- Main content -->
+      <div class="content-wrapper">
+        <!-- Hero section with star background -->
+        <section id="hero" class="hero">
+          <div class="hero-content">
+            <div class="hero-title">
+              <span>Can</span>
+              <img src="/Canfusion_logo.svg" alt="Logo" class="hero-logo" />
+              <span>Fusion</span>
+            </div>
+            <span class="hero-subtitle">KTU inžinerijos licėjus</span>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <div id="bio-section" class="bio-container">
+    <div class="bio1">
+      <div class="name">Dominykas</div>
+      <div class="bio-text">TESTING TESTING</div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const menuOpen = ref(false);
+
+const toggleMenu = () => {
+  menuOpen.value = !menuOpen.value;
+};
+
+const closeMenu = () => {
+  menuOpen.value = false;
+  setTimeout(() => {
+    const target = document.querySelector(window.location.hash);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, 100);
+};
+</script>
+
+<style>
+/* Import Orbitron font */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap');
+/* Import News Gothic font (or alternative if unavailable) */
+@import url('https://fonts.googleapis.com/css2?family=News+Cycle:wght@400;700&display=swap');
+
+/* =============================================
+   COMMON BASE STYLES (APPLIES TO ALL SCREENS)
+   ============================================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background-color: #0f172a
+}
+
+.app-container {
+  font-family: 'Orbitron', sans-serif;
+  width: 100%;
+}
+
+.content-wrapper {
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.background-video {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Header (common across all screen sizes) */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 5rem;
+  background-color: transparent;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 1.5rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logo {
+  height: 3.5rem;
+  width: auto;
+}
+
+.brand-name {
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 2rem;
+  font-family: 'Orbitron', sans-serif;
+}
+
+/* Navigation base styles */
+.nav-link {
+  color: white;
+  font-weight: 500;
+  font-size: 1.7rem;
+  text-decoration: underline;
+  transition: color 0.2s;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.nav-link:hover,
+.nav-link:active,
+.nav-link:focus {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+/* Hero section base styles */
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+  overflow: hidden; /* Prevent content from overflowing */
+}
+
+.hero-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: relative;
+  width: 100%;
+  padding: 0 1rem;
+}
+
+.hero-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  color: white;
+  font-size: clamp(2rem, 5vw, 3rem); /* Responsive font size with clamp */
+  animation: fadeIn 1s ease-in-out;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+  width: 100%;
+}
+
+.hero-title span {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+  white-space: nowrap;
+}
+
+.hero-logo {
+  height: clamp(3rem, 8vw, 4.5rem); /* Responsive logo size */
+  width: auto;
+  animation: fadeIn 1s ease-in-out;
+  min-width: 0;
+}
+
+.hero-subtitle {
+  color: white;
+  font-size: clamp(1.2rem, 3.5vw, 1.8rem); /* Responsive font size with clamp */
+  font-family: 'News Gothic', 'News Cycle', sans-serif;
+  animation: fadeIn 1s ease-in-out;
+  white-space: nowrap; /* Prevent text from wrapping */
+}
+
+/* Team introduction base styles */
+.team-intro {
+  min-height: 100vh;
+  background-color: #0f172a;
+  color: white;
+  padding: 6rem 1rem 3rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: rgba(30, 41, 59, 0.9);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 3;
+}
+
+/* Bio container styles */
+.bio-container {
+  background-color: #0f172a;
+  padding: 3rem 1rem;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 2rem;
+  width: 100%;
+}
+
+.bio1 {
+  width: 20rem;
+  height: 15rem;
+  background-color: rgba(30, 41, 59, 0.8);
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  margin-left: 1rem;
+}
+
+.bio1:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+}
+
+.name {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  font-size: 1.8rem;
+  color: #2563eb;
+  border-bottom: 2px solid #2563eb;
+  padding-bottom: 0.5rem;
+}
+
+.bio-text {
+  font-family: 'News Gothic', 'News Cycle', sans-serif;
+  color: white;
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+/* =============================================
+   1. LARGE SCREENS (DESKTOPS)
+   ============================================= */
+@media (min-width: 1024px) {
+  /* Desktop-specific hero styles */
+  .hero-title {
+    font-size: 5rem;
+  }
+  
+  .hero-logo {
+    height: 8rem;
+  }
+  
+  .hero-subtitle {
+    font-size: 3rem;
+  }
+  
+  .hero-title span {
+    font-weight: 700;
+    -webkit-text-stroke: 0;
+  }
+  
+  /* Desktop-specific navigation */
+  .desktop-nav {
+    display: flex;
+    gap: 2.5rem;
+  }
+  
+  .menu-toggle {
+    display: none;
+  }
+}
+
+/* Tablet and larger (includes both tablets and desktops) */
+@media (min-width: 768px) {
+  .desktop-nav {
+    display: flex;
+  }
+  
+  .menu-toggle {
+    display: none;
+  }
+  
+  .hero-title {
+    font-size: clamp(3rem, 6vw, 4rem);
+  }
+  
+  .hero-logo {
+    height: clamp(4.5rem, 9vw, 6rem);
+  }
+  
+  .hero-subtitle {
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+  }
+  
+  .container {
+    padding: 3rem;
+  }
+  
+  .hero-title span {
+    font-weight: 700;
+    -webkit-text-stroke: 0;
+  }
+}
+
+/* =============================================
+   2. PHONES (MOBILE)
+   ============================================= */
+@media (max-width: 767px) {
+  /* Mobile header */
+  .header-inner {
+    padding: 0 1rem;
+  }
+  
+  .brand-name {
+    font-size: 1.6rem;
+  }
+  
+  /* Mobile navigation */
+  .desktop-nav {
+    display: none;
+  }
+  
+  .menu-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .menu-toggle svg {
+    width: 2rem;
+    height: 2rem;
+    color: white;
+  }
+  
+  .mobile-menu {
+    position: fixed;
+    top: 5rem;
+    left: 0;
+    width: 100%;
+    background: rgba(15, 23, 42, 0.9);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    gap: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 9;
+  }
+  
+  .mobile-menu .nav-link {
+    padding: 1.2rem 0;
+    font-size: 1.8rem;
+    -webkit-tap-highlight-color: rgba(37, 99, 235, 0.1);
+  }
+  
+  /* Mobile tap feedback */
+  .mobile-menu .nav-link:active {
+    color: #2563eb;
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+  
+  /* Mobile hero adjustments - replace scaling with fluid sizing */
+  .hero-title {
+    font-size: clamp(3rem, 10vw, 4rem);
+    gap: 0.4rem;
+  }
+  
+  .hero-logo {
+    height: clamp(5rem, 12vw, 6rem);
+  }
+  
+  .hero-subtitle {
+    font-size: clamp(2rem, 7vw, 2.5rem);
+    margin-top: 0.5rem;
+  }
+  
+  /* Center bio card on mobile */
+  .bio-container {
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .bio1 {
+    margin-left: 0; /* Remove left margin on mobile */
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 360px) {
+  .hero-title {
+    font-size: clamp(2.5rem, 9vw, 3.5rem);
+    gap: 0.3rem;
+  }
+  
+  .hero-logo {
+    height: clamp(4rem, 11vw, 5rem);
+  }
+  
+  .hero-subtitle {
+    font-size: clamp(1.8rem, 6vw, 2.2rem);
+  }
+}
+
+/* =============================================
+   3. TABLETS
+   ============================================= */
+/* Tablet-specific styles (768px-1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .header-inner {
+    padding: 0 1rem;
+  }
+  
+  .brand-name {
+    font-size: 1.5rem;
+  }
+  
+  .logo {
+    height: 2.8rem;
+  }
+  
+  .desktop-nav {
+    gap: 1.2rem;
+  }
+  
+  .nav-link {
+    font-size: 1.3rem;
+  }
+}
+
+/* Fix for smaller tablets (768px-858px) where navbar breaks */
+@media (min-width: 768px) and (max-width: 858px) {
+  .nav-link {
+    font-size: 1.1rem;
+    font-weight: 500;
+  }
+}
+
+/* =============================================
+   4. ANIMATIONS
+   ============================================= */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-10px); opacity: 0; }
+}
+
+/* Vue transition classes for mobile menu */
+.menu-transition-enter-active {
+  animation: slideDown 0.3s ease-out;
+}
+
+.menu-transition-leave-active {
+  animation: slideUp 0.2s ease-in;
+}
+
+/* Add smooth scrolling behavior to the whole page */
+html {
+  scroll-behavior: smooth;
+}
+</style> 
