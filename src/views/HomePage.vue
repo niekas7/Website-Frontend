@@ -17,7 +17,7 @@
       <header class="header">
         <div class="header-inner">
           <div class="brand">
-            <img src="/Canfusion_logo.svg" alt="Logo" class="logo" />
+            <img src="/canfusion_logo.svg" alt="Logo" class="logo" />
             <span class="brand-name">CanFusion</span>
           </div>
 
@@ -61,7 +61,7 @@
           <div class="hero-content">
             <div class="hero-title">
               <span>Can</span>
-              <img src="/Canfusion_logo.svg" alt="Logo" class="hero-logo" />
+              <img src="/canfusion_logo.svg" alt="Logo" class="hero-logo" />
               <span>Fusion</span>
             </div>
             <span class="hero-subtitle">KTU inžinerijos licėjus</span>
