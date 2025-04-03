@@ -17,14 +17,14 @@
       <header class="header">
         <div class="header-inner">
           <div class="brand">
-            <img src="/Canfusion_logo.svg" alt="Logo" class="logo" />
+            <img src="/canfusion_logo.svg" alt="Logo" class="logo" />
             <span class="brand-name">CanFusion</span>
           </div>
 
           <nav class="desktop-nav">
-            <a href="#hero" class="nav-link">Misija</a>
-            <a href="" class="nav-link">Projekto progresas</a>
-            <a href="#bio-section" class="nav-link">Apie mus</a>
+            <a href="#hero" class="nav-link" @click="(e) => handleNavClick(e, '#hero')">Misija</a>
+            <a href="#progress" class="nav-link" @click="(e) => handleNavClick(e, '#progress')">Projekto progresas</a>
+            <a href="#bio-section" class="nav-link" @click="(e) => handleNavClick(e, '#bio-section')">Apie mus</a>
             <a href="/galerija" class="nav-link">Galerija</a>
             <router-link to="/track" class="nav-link">Žemėlapis</router-link>
           </nav>
@@ -61,7 +61,7 @@
           <div class="hero-content">
             <div class="hero-title">
               <span>Can</span>
-              <img src="/Canfusion_logo.svg" alt="Logo" class="hero-logo" />
+              <img src="/canfusion_logo.svg" alt="Logo" class="hero-logo" />
               <span>Fusion</span>
             </div>
             <span class="hero-subtitle">KTU inžinerijos licėjus</span>
@@ -69,11 +69,11 @@
         </section>
       </div>
     </div>
-  </div>
-  <div id="bio-section" class="bio-container">
-    <div class="bio1">
-      <div class="name">Dominykas</div>
-      <div class="bio-text">TESTING TESTING</div>
+    <div id="bio-section" class="bio-container">
+      <div class="bio1">
+        <div class="name">Dominykas</div>
+        <div class="bio-text">TESTING TESTING</div>
+      </div>
     </div>
   </div>
 </template>
@@ -89,12 +89,28 @@ const toggleMenu = () => {
 
 const closeMenu = () => {
   menuOpen.value = false;
-  setTimeout(() => {
-    const target = document.querySelector(window.location.hash);
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, 100);
+  // Updated scrolling behavior
+  const hash = window.location.hash;
+  if (hash) {
+    setTimeout(() => {
+      document.querySelector(hash)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }, 100);
+  }
+};
+
+// Add new function for handling navigation clicks
+const handleNavClick = (event, targetId) => {
+  event.preventDefault();
+  const target = document.querySelector(targetId);
+  if (target) {
+    target.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
+  }
 };
 </script>
 
@@ -121,15 +137,34 @@ body {
   background-color: #0f172a
 }
 
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: visible;
+  height: auto;
+  width: 100%;
+}
+
+.whole-page {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
 .app-container {
   font-family: 'Orbitron', sans-serif;
   width: 100%;
+  position: relative;
+  overflow: hidden;
 }
 
 .content-wrapper {
   width: 100%;
   position: relative;
   z-index: 1;
+  overflow: visible;
 }
 
 .background-video {
@@ -137,7 +172,7 @@ body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: 100vh;
   object-fit: cover;
   z-index: -1;
   pointer-events: none;
@@ -558,9 +593,4 @@ body {
 .menu-transition-leave-active {
   animation: slideUp 0.2s ease-in;
 }
-
-/* Add smooth scrolling behavior to the whole page */
-html {
-  scroll-behavior: smooth;
-}
-</style> 
+</style>
