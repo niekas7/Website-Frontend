@@ -67,41 +67,45 @@
             <span class="hero-subtitle">KTU inžinerijos licėjus</span>
           </div>
         </section>
-      </div>
-    </div>
 
-    <!-- Mission section - outside app-container -->
-    <section id="mission" class="mission-section">
-      <div class="mission-container">
-        <h2 class="section-title">Misija</h2>
-        <div class="mission-content">
-          <p class="mission-text">
-            Mūsų projekto tikslas yra sukurti inovatyvų CanSat palydovą, kuris ne tik atitiktų visus konkurso reikalavimus, 
-            bet ir leistų atlikti mokslinius tyrimus atmosferoje. Siekiame tobulinti savo inžinerines žinias, 
-            komandinio darbo įgūdžius ir prisidėti prie kosmoso technologijų plėtros Lietuvoje.
-          </p>
-          <p class="mission-text" style="margin-top: 1rem;">
-            Pagrindinė misija – įkvepti kūrybiškumą ir asmeninį tobulėjimą, suteikiant galimybę komandai atrasti 
-            naujus sprendimus, įgyvendinti inovacijas ir augti kartu per praktinius inžinerijos iššūkius.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <div id="bio-section" class="bio-container">
-      <div class="bio1">
-        <div class="bio-content">
-          <div class="bio-left">
-            <div class="name-container">
-              <div class="name" @click="toggleBio">Dominykas</div>
-              <button class="bio-toggle" @click="toggleBio" :class="{ 'open': bioOpen }">
-                <span class="arrow"></span>
-              </button>
+        <!-- Mission section now inside app-container -->
+        <section id="mission" class="mission-section">
+          <div class="mission-container">
+            <h2 class="section-title">Misija</h2>
+            <div class="mission-content">
+              <p class="mission-text">
+                Mūsų projekto tikslas yra sukurti inovatyvų CanSat palydovą, kuris ne tik atitiktų visus konkurso reikalavimus, 
+                bet ir leistų atlikti mokslinius tyrimus atmosferoje. Siekiame tobulinti savo inžinerines žinias, 
+                komandinio darbo įgūdžius ir prisidėti prie kosmoso technologijų plėtros Lietuvoje.
+              </p>
+              <p class="mission-text" style="margin-top: 1rem;">
+                Pagrindinė misija – įkvepti kūrybiškumą ir asmeninį tobulėjimą, suteikiant galimybę komandai atrasti 
+                naujus sprendimus, įgyvendinti inovacijas ir augti kartu per praktinius inžinerijos iššūkius.
+              </p>
             </div>
-            <div class="bio-text" :class="{ 'visible': bioOpen }">Sveiki! Aš esu Dominykas, CanFusion komandos narys atsakingas už mechanikos, konstravimo ir visų techninių detalių įgyvendinimą CanSat projekte. Mano pagrindinės atsakomybės apima sistemų projektavimą, komponentų paiešką bei gamybą, techninius skaičiavimus, praktinius testavimus, taip pat viso proceso vykdymo sklandumą ir optimizavimą.<br><br>Be to, rūpinuosi, kad mūsų projekto žinia pasiektų platesnę auditoriją – prisidedu prie viešosios projekto sklaidos ir pristatymo. Man svarbu, kad kiekvienas žingsnis būtų atliktas efektyviai ir inovatyviai, siekiant maksimaliai kokybiško rezultato, todėl bandau komandoje diegti efektyvumą bei komandos tarpusavio darba gerinančius įrankius.</div>
           </div>
-          <div class="bio-right">
-            <img src="/Dominykas.png" alt="Dominykas" class="bio-image" />
+        </section>
+
+        <!-- Bio section now inside app-container -->
+        <div id="bio-section" class="bio-container">
+          <div class="bio1">
+            <div class="bio-content">
+              <div class="bio-left">
+                <div class="name-container">
+                  <div class="name" @click="toggleBio">Dominykas</div>
+                  <button class="bio-toggle" @click="toggleBio" :class="{ 'open': bioOpen }">
+                    <span class="arrow"></span>
+                  </button>
+                </div>
+                <div class="bio-text" :class="{ 'visible': bioOpen }">
+                  Sveiki! Aš esu Dominykas, CanFusion komandos narys atsakingas už mechanikos, konstravimo ir visų techninių detalių įgyvendinimą CanSat projekte. Mano pagrindinės atsakomybės apima sistemų projektavimą, komponentų paiešką bei gamybą, techninius skaičiavimus, praktinius testavimus, taip pat viso proceso vykdymo sklandumą ir optimizavimą.<br><br>
+                  Be to, rūpinuosi, kad mūsų projekto žinia pasiektų platesnę auditoriją – prisidedu prie viešosios projekto sklaidos ir pristatymo. Man svarbu, kad kiekvienas žingsnis būtų atliktas efektyviai ir inovatyviai, siekiant maksimaliai kokybiško rezultato, todėl bandau komandoje diegti efektyvumą bei komandos tarpusavio darba gerinančius įrankius.
+                </div>
+              </div>
+              <div class="bio-right">
+                <img src="/Dominykas.png" alt="Dominykas" class="bio-image" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -207,8 +211,10 @@ html, body {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100vh;
+  width: 100vw;      /* Use viewport width */
+  height: 100vh;     /* Use viewport height */
+  min-width: 100vw;
+  min-height: 100vh;
   object-fit: cover;
   z-index: -1;
   pointer-events: none;
@@ -354,7 +360,7 @@ html, body {
 
 /* Bio container styles */
 .bio-container {
-  background-color: #0f172a;
+  background-color: transparent;
   padding: 3rem;
   display: flex;
   justify-content: flex-start;
@@ -763,7 +769,7 @@ html, body {
   align-items: center;
   justify-content: center;
   position: relative;
-  background-color: #0f172a;
+  background-color: transparent;
   z-index: 2;
 }
 
@@ -771,7 +777,7 @@ html, body {
   max-width: 900px;
   margin: 0 auto;
   padding: 3rem;
-  background-color: rgba(30, 41, 59, 0.9);
+  background-color: rgba(30, 41, 59, 0.8);
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   text-align: center;
