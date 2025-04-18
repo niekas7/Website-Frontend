@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" href="/Canfusion_logo.svg" />
+  <link rel="icon" href="/canfusion_logo.svg" type="image/svg+xml" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CanFusion</title>
   <!-- Include Cesium CSS directly -->
@@ -24,11 +24,11 @@
 <body>
   <div id="app"></div>
   <script>
-    // Configure Cesium base URL and token
+    // Configure Cesium base URL
     window.CESIUM_BASE_URL = '/cesium';
     
-    // Set your token globally
-    window.CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI0NzU2Mjc3NS1iNmIwLTRiODAtODI3Ni01MzM2ZmMzYTE2YWMiLCJpZCI6Mjg2MTU4LCJpYXQiOjE3NDI0OTA1MDZ9.T_NaLfVGMt5gItoV0EbnYKYaYQD5UFkwIN6b1nyqqz4';
+    // Set token from environment variable
+    window.CESIUM_TOKEN = import.meta.env.VITE_CESIUM_TOKEN;
     
     // Set Ion token immediately
     if (window.Cesium && window.Cesium.Ion) {

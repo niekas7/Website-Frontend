@@ -22,7 +22,7 @@
           </div>
 
           <nav class="desktop-nav">
-            <a href="#hero" class="nav-link" @click="(e) => handleNavClick(e, '#hero')">Misija</a>
+            <a href="#mission" class="nav-link" @click="(e) => handleNavClick(e, '#mission')">Misija</a>
             <a href="#progress" class="nav-link" @click="(e) => handleNavClick(e, '#progress')">Projekto progresas</a>
             <a href="#bio-section" class="nav-link" @click="(e) => handleNavClick(e, '#bio-section')">Apie mus</a>
             <a href="/galerija" class="nav-link">Galerija</a>
@@ -46,8 +46,8 @@
       <!-- Mobile menu -->
       <transition name="menu-transition">
         <div v-if="menuOpen" class="mobile-menu">
-          <a href="#hero" class="nav-link" @click="closeMenu">Misija</a>
-          <a href="" class="nav-link" @click="closeMenu">Projekto progresas</a>
+          <a href="#mission" class="nav-link" @click="closeMenu">Misija</a>
+          <a href="#progress" class="nav-link" @click="closeMenu">Projekto progresas</a>
           <a href="#bio-section" class="nav-link" @click="closeMenu">Apie mus</a>
           <a href="/galerija" class="nav-link" @click="closeMenu">Galerija</a>
           <router-link to="/track" class="nav-link" @click="closeMenu">Žemėlapis</router-link>
@@ -69,10 +69,41 @@
         </section>
       </div>
     </div>
+
+    <!-- Mission section - outside app-container -->
+    <section id="mission" class="mission-section">
+      <div class="mission-container">
+        <h2 class="section-title">Misija</h2>
+        <div class="mission-content">
+          <p class="mission-text">
+            Mūsų projekto tikslas yra sukurti inovatyvų CanSat palydovą, kuris ne tik atitiktų visus konkurso reikalavimus, 
+            bet ir leistų atlikti mokslinius tyrimus atmosferoje. Siekiame tobulinti savo inžinerines žinias, 
+            komandinio darbo įgūdžius ir prisidėti prie kosmoso technologijų plėtros Lietuvoje.
+          </p>
+          <p class="mission-text" style="margin-top: 1rem;">
+            Pagrindinė misija – įkvepti kūrybiškumą ir asmeninį tobulėjimą, suteikiant galimybę komandai atrasti 
+            naujus sprendimus, įgyvendinti inovacijas ir augti kartu per praktinius inžinerijos iššūkius.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <div id="bio-section" class="bio-container">
       <div class="bio1">
-        <div class="name">Dominykas</div>
-        <div class="bio-text">TESTING TESTING</div>
+        <div class="bio-content">
+          <div class="bio-left">
+            <div class="name-container">
+              <div class="name" @click="toggleBio">Dominykas</div>
+              <button class="bio-toggle" @click="toggleBio" :class="{ 'open': bioOpen }">
+                <span class="arrow"></span>
+              </button>
+            </div>
+            <div class="bio-text" :class="{ 'visible': bioOpen }">Sveiki! Aš esu Dominykas, CanFusion komandos narys atsakingas už mechanikos, konstravimo ir visų techninių detalių įgyvendinimą CanSat projekte. Mano pagrindinės atsakomybės apima sistemų projektavimą, komponentų paiešką bei gamybą, techninius skaičiavimus, praktinius testavimus, taip pat viso proceso vykdymo sklandumą ir optimizavimą.<br><br>Be to, rūpinuosi, kad mūsų projekto žinia pasiektų platesnę auditoriją – prisidedu prie viešosios projekto sklaidos ir pristatymo. Man svarbu, kad kiekvienas žingsnis būtų atliktas efektyviai ir inovatyviai, siekiant maksimaliai kokybiško rezultato, todėl bandau komandoje diegti efektyvumą bei komandos tarpusavio darba gerinančius įrankius.</div>
+          </div>
+          <div class="bio-right">
+            <img src="/Dominykas.png" alt="Dominykas" class="bio-image" />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -82,9 +113,14 @@
 import { ref } from 'vue';
 
 const menuOpen = ref(false);
+const bioOpen = ref(false);
 
 const toggleMenu = () => {
   menuOpen.value = !menuOpen.value;
+};
+
+const toggleBio = () => {
+  bioOpen.value = !bioOpen.value;
 };
 
 const closeMenu = () => {
@@ -319,50 +355,174 @@ html, body {
 /* Bio container styles */
 .bio-container {
   background-color: #0f172a;
-  padding: 3rem 1rem;
+  padding: 3rem;
   display: flex;
   justify-content: flex-start;
   align-items: flex-start;
   flex-wrap: wrap;
-  gap: 2rem;
   width: 100%;
 }
 
 .bio1 {
-  width: 20rem;
-  height: 15rem;
+  width: 100%;
+  max-width: 1200px;
+  height: auto;
   background-color: rgba(30, 41, 59, 0.8);
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  margin-left: 1rem;
+  padding: 2rem;
+  margin-left: 0;
 }
 
-.bio1:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+.bio-content {
+  display: flex;
+  gap: 2rem;
+}
+
+.bio-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.bio-right {
+  flex: 0 0 40%;
+  display: flex;
+  align-items: flex-start;
+}
+
+.bio-image {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.name-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #2563eb;
+  padding-bottom: 0.5rem;
 }
 
 .name {
   font-family: 'Orbitron', sans-serif;
   font-weight: 700;
-  font-size: 1.8rem;
+  font-size: 2rem;
   color: #2563eb;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.bio-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  position: relative;
+  display: none; /* Hide by default for all devices */
+  align-items: center;
+  justify-content: center;
+  margin-left: 1rem; /* Add spacing from the name */
+}
+
+.arrow {
+  display: block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-right: 2px solid #2563eb;
   border-bottom: 2px solid #2563eb;
-  padding-bottom: 0.5rem;
+  transform: rotate(-45deg);
+  transition: transform 0.3s ease;
+  position: relative;
+  right: 0.2rem; /* Slight adjustment to center the arrow in its container */
+}
+
+.bio-toggle.open .arrow {
+  transform: rotate(45deg);
 }
 
 .bio-text {
-  font-family: 'News Gothic', 'News Cycle', sans-serif;
   color: white;
-  font-size: 1rem;
-  line-height: 1.5;
-  overflow-y: auto;
-  flex-grow: 1;
+  font-family: 'News Gothic', 'News Cycle', sans-serif;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-top: 1rem;
+  text-align: justify;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
+}
+
+/* Add mobile responsiveness */
+@media (max-width: 768px) {
+  .bio-content {
+    flex-direction: column-reverse;
+  }
+  
+  .bio-right {
+    flex: 0 0 auto;
+    margin-bottom: 1.5rem;
+  }
+  
+  .bio-image {
+    max-height: 300px; /* Limit image height on mobile */
+    width: 100%;
+    object-fit: cover;
+  }
+  
+  .bio1 {
+    margin: 1rem;
+  }
+
+  .bio-text {
+    font-size: 1rem;
+    line-height: 1.5;
+    padding: 0 0.5rem;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease, margin 0.3s ease;
+    margin-top: 0;
+    text-align: left; /* Left align on mobile for better readability */
+    hyphens: auto; /* Enable hyphenation for better text wrapping */
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  .bio-text.visible {
+    max-height: 2000px; /* Increase to ensure all text is shown */
+    margin-top: 1rem;
+    padding-bottom: 1rem; /* Add some padding at the bottom */
+  }
+
+  .bio-toggle {
+    display: flex; /* Only show on mobile */
+  }
+
+  .name-container {
+    align-items: center;
+    padding-right: 0.5rem; /* Ensure there's space on the right side */
+  }
+  
+  .name {
+    font-size: 1.8rem; /* Slightly smaller on mobile */
+    cursor: pointer; /* Show pointer cursor to indicate clickability */
+  }
+
+  .bio-container {
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    display: flex;
+  }
+  
+  .bio1 {
+    margin: 0 auto;
+  }
 }
 
 /* =============================================
@@ -592,5 +752,70 @@ html, body {
 
 .menu-transition-leave-active {
   animation: slideUp 0.2s ease-in;
+}
+
+/* Mission section styles */
+.mission-section {
+  min-height: 100vh;
+  width: 100%;
+  padding: 6rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background-color: #0f172a;
+  z-index: 2;
+}
+
+.mission-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 3rem;
+  background-color: rgba(30, 41, 59, 0.9);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.section-title {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  font-size: 3rem;
+  color: #2563eb;
+  margin-bottom: 2rem;
+  letter-spacing: 0.05em;
+}
+
+.mission-content {
+  width: 100%;
+}
+
+.mission-text {
+  color: white;
+  font-family: 'News Gothic', 'News Cycle', sans-serif;
+  font-size: 1.2rem;
+  line-height: 1.8;
+  text-align: justify;
+}
+
+/* Mobile styles for mission section */
+@media (max-width: 767px) {
+  .mission-section {
+    padding: 5rem 1rem;
+  }
+  
+  .mission-container {
+    padding: 2rem 1.5rem;
+  }
+  
+  .section-title {
+    font-size: 2.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .mission-text {
+    font-size: 1.1rem;
+    line-height: 1.6;
+  }
 }
 </style>
