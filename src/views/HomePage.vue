@@ -107,6 +107,26 @@
               </div>
             </div>
           </div>
+          
+          <div class="bio2">
+            <div class="bio-content">
+              <div class="bio-right">
+                <img src="/Kipras.png" alt="Kipras" class="bio-image" />
+              </div>
+              <div class="bio-left">
+                <div class="name-container">
+                  <div class="name" @click="toggleBio2">Kipras</div>
+                  <button class="bio-toggle" @click="toggleBio2" :class="{ 'open': bio2Open }">
+                    <span class="arrow"></span>
+                  </button>
+                </div>
+                <div class="bio-text" :class="{ 'visible': bio2Open }">
+                  Sveiki! Aš esu Kipras, CanFusion komandos narys, atsakingas už elektroniką ir pagrindinį ryšio tiltą tarp CanSat ir žemės stoties – ESP32 modulį. Mano darbas apima elektroninių schemų kūrimą, komponentų parinkimą, litavimą ir integraciją į CanSat konstrukciją. Taip pat rūpinuosi, kad ESP32 patikimai perduotų duomenis į žemės stotį naudojant LoRa ryšio modulį.<br><br>
+                  Nors sudėtingi skaičiavimai ir skrydžio sprendimai vykdomi žemės stotyje, mano atsakomybė – užtikrinti stabilų ir patikimą duomenų srautą iš CanSat į ją. Dirbu tam, kad visa elektronika veiktų tiksliai, o ryšys išliktų stiprus net sudėtingomis sąlygomis. Mano tikslas – sukurti efektyvią ir patikimą elektroninę aplinką CanSat sėkmei.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -118,6 +138,7 @@ import { ref } from 'vue';
 
 const menuOpen = ref(false);
 const bioOpen = ref(false);
+const bio2Open = ref(false);
 
 const toggleMenu = () => {
   menuOpen.value = !menuOpen.value;
@@ -125,6 +146,10 @@ const toggleMenu = () => {
 
 const toggleBio = () => {
   bioOpen.value = !bioOpen.value;
+};
+
+const toggleBio2 = () => {
+  bio2Open.value = !bio2Open.value;
 };
 
 const closeMenu = () => {
@@ -367,22 +392,31 @@ html, body {
   align-items: flex-start;
   flex-wrap: wrap;
   width: 100%;
+  gap: 3rem;
+}
+
+.bio1, .bio2 {
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+  background-color: rgba(30, 41, 59, 0.8);
+  border-radius: 24px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  padding: 1.5rem;
 }
 
 .bio1 {
-  width: 100%;
-  max-width: 1200px;
-  height: auto;
-  background-color: rgba(30, 41, 59, 0.8);
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  padding: 2rem;
   margin-left: 0;
+}
+
+.bio2 {
+  margin-right: 0;
+  margin-left: auto;
 }
 
 .bio-content {
   display: flex;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .bio-left {
@@ -393,15 +427,16 @@ html, body {
 }
 
 .bio-right {
-  flex: 0 0 40%;
+  flex: 0 0 35%;
   display: flex;
   align-items: flex-start;
 }
 
 .bio-image {
   width: 100%;
+  max-width: 300px;
   height: auto;
-  border-radius: 8px;
+  border-radius: 20px;
   object-fit: cover;
 }
 
@@ -416,7 +451,7 @@ html, body {
 .name {
   font-family: 'Orbitron', sans-serif;
   font-weight: 700;
-  font-size: 2rem;
+  font-size: 1.8rem;
   color: #2563eb;
   border-bottom: none;
   padding-bottom: 0;
@@ -454,8 +489,8 @@ html, body {
 .bio-text {
   color: white;
   font-family: 'News Gothic', 'News Cycle', sans-serif;
-  font-size: 1.1rem;
-  line-height: 1.6;
+  font-size: 1rem;
+  line-height: 1.5;
   margin-top: 1rem;
   text-align: justify;
   max-width: 100%;
@@ -476,13 +511,13 @@ html, body {
   }
   
   .bio-image {
-    max-height: 300px; /* Limit image height on mobile */
+    max-height: 250px; /* Limit image height on mobile */
     width: 100%;
     object-fit: cover;
   }
   
-  .bio1 {
-    margin: 1rem;
+  .bio1, .bio2 {
+    margin: 1rem auto;
   }
 
   .bio-text {
@@ -526,7 +561,7 @@ html, body {
     display: flex;
   }
   
-  .bio1 {
+  .bio1, .bio2 {
     margin: 0 auto;
   }
 }
@@ -678,7 +713,7 @@ html, body {
     align-items: center;
   }
   
-  .bio1 {
+  .bio1, .bio2 {
     margin-left: 0; /* Remove left margin on mobile */
   }
 }
@@ -778,7 +813,7 @@ html, body {
   margin: 0 auto;
   padding: 3rem;
   background-color: rgba(30, 41, 59, 0.8);
-  border-radius: 8px;
+  border-radius: 24px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   text-align: center;
 }
