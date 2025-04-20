@@ -127,6 +127,46 @@
               </div>
             </div>
           </div>
+          
+          <div class="bio3">
+            <div class="bio-content">
+              <div class="bio-left">
+                <div class="name-container">
+                  <div class="name" @click="toggleBio3">Emilis</div>
+                  <button class="bio-toggle" @click="toggleBio3" :class="{ 'open': bio3Open }">
+                    <span class="arrow"></span>
+                  </button>
+                </div>
+                <div class="bio-text" :class="{ 'visible': bio3Open }">
+                  Sveiki! Aš esu Emilis, CanFusion komandos narys, prisidedantis prie mechanikos inžinerijos, idėjų generavimo ir bendro projekto sklandumo. Mano pareigos yra glaudžiai susijusios su Dominyko veikla – dėl panašių interesų ir įgūdžių mes efektyviai bendradarbiaujame, kad užduotys būtų įgyvendinamos greitai ir kokybiškai.<br><br>
+                  Taip pat aktyviai prisidedu prie projekto ir komandos viešinimo, kad mūsų veikla pasiektų kuo platesnę auditoriją. Esu visada pasirengęs padėti kitiems komandos nariams, kai reikia papildomų rankų ar šviežių idėjų, siekdamas užtikrinti sklandų darbų eigą ir gerą komandinę atmosferą.
+                </div>
+              </div>
+              <div class="bio-right">
+                <img src="/Emilis.png" alt="Emilis" class="bio-image" />
+              </div>
+            </div>
+          </div>
+          
+          <div class="bio4">
+            <div class="bio-content">
+              <div class="bio-right">
+                <img src="/Kristupas.png" alt="Kristupas" class="bio-image" />
+              </div>
+              <div class="bio-left">
+                <div class="name-container">
+                  <div class="name" @click="toggleBio4">Kristupas</div>
+                  <button class="bio-toggle" @click="toggleBio4" :class="{ 'open': bio4Open }">
+                    <span class="arrow"></span>
+                  </button>
+                </div>
+                <div class="bio-text" :class="{ 'visible': bio4Open }">
+                  Sveiki! Aš esu Kristupas, CanFusion komandos narys, atsakingas už CanSat projekto elektronikos dalį. Mano pagrindinės atsakomybės apima tinkamiausių elektronikos komponentų atranką, jų kainų analizę ir bendro biudžeto planavimą, taip pat atsakingai rūpinuosi visų vidinių elektronikos mazgų litavimu bei jų patikimu veikimu.<br><br>
+                  Užtikrinu, kad visa elektroninė sistema veiktų sklandžiai ir būtų techniškai pasiruošusi išbandymams bei paleidimui. Mano tikslas – užtikrinti kokybę, tikslumą ir patikimumą kiekviename etape, todėl nuolat siekiu geriausių sprendimų ir glaudaus bendradarbiavimo su komanda.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -139,6 +179,8 @@ import { ref } from 'vue';
 const menuOpen = ref(false);
 const bioOpen = ref(false);
 const bio2Open = ref(false);
+const bio3Open = ref(false);
+const bio4Open = ref(false);
 
 const toggleMenu = () => {
   menuOpen.value = !menuOpen.value;
@@ -150,6 +192,14 @@ const toggleBio = () => {
 
 const toggleBio2 = () => {
   bio2Open.value = !bio2Open.value;
+};
+
+const toggleBio3 = () => {
+  bio3Open.value = !bio3Open.value;
+};
+
+const toggleBio4 = () => {
+  bio4Open.value = !bio4Open.value;
 };
 
 const closeMenu = () => {
@@ -395,7 +445,7 @@ html, body {
   gap: 3rem;
 }
 
-.bio1, .bio2 {
+.bio1, .bio2, .bio3, .bio4 {
   width: 100%;
   max-width: 900px;
   height: auto;
@@ -410,6 +460,16 @@ html, body {
 }
 
 .bio2 {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+.bio3 {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.bio4 {
   margin-right: 0;
   margin-left: auto;
 }
@@ -429,7 +489,9 @@ html, body {
 .bio-right {
   flex: 0 0 35%;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .bio-image {
@@ -438,6 +500,9 @@ html, body {
   height: auto;
   border-radius: 20px;
   object-fit: cover;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .name-container {
@@ -516,7 +581,7 @@ html, body {
     object-fit: cover;
   }
   
-  .bio1, .bio2 {
+  .bio1, .bio2, .bio3, .bio4 {
     margin: 1rem auto;
   }
 
@@ -561,7 +626,7 @@ html, body {
     display: flex;
   }
   
-  .bio1, .bio2 {
+  .bio1, .bio2, .bio3, .bio4 {
     margin: 0 auto;
   }
 }
@@ -713,7 +778,7 @@ html, body {
     align-items: center;
   }
   
-  .bio1, .bio2 {
+  .bio1, .bio2, .bio3, .bio4 {
     margin-left: 0; /* Remove left margin on mobile */
   }
 }
