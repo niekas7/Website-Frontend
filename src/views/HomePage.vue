@@ -167,6 +167,26 @@
               </div>
             </div>
           </div>
+          
+          <div class="bio5">
+            <div class="bio-content">
+              <div class="bio-left">
+                <div class="name-container">
+                  <div class="name" @click="toggleBio5">Domantas</div>
+                  <button class="bio-toggle" @click="toggleBio5" :class="{ 'open': bio5Open }">
+                    <span class="arrow"></span>
+                  </button>
+                </div>
+                <div class="bio-text" :class="{ 'visible': bio5Open }">
+                  Sveiki! Aš esu Domantas, CanFusion komandos pagrindinis programuotojas, atsakingas už šio tinklalapio kūrimą ir CanSat valdymą iš projekto serverio. Mano darbas apima tinklalapio architektūros projektavimą, funkcionalumo kūrimą ir realaus laiko duomenų apdorojimą iš CanSat palydovo.<br><br>
+                  Užtikrinu, kad tinklalapis būtų ne tik informatyvus ir vizualiai patrauklus, bet ir funkcionalus kaip valdymo centras, kuriame galima stebėti CanSat parametrus realiu laiku. Taip pat kuriu tvirtą serverio infrastruktūrą, kuri patikimai priima, apdoroja ir perduoda duomenis iš CanSat, užtikrindamas sklandų viso projekto darbą technologiniame lygmenyje.
+                </div>
+              </div>
+              <div class="bio-right">
+                <img src="/Domantas.png" alt="Domantas" class="bio-image" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -181,6 +201,7 @@ const bioOpen = ref(false);
 const bio2Open = ref(false);
 const bio3Open = ref(false);
 const bio4Open = ref(false);
+const bio5Open = ref(false);
 
 const toggleMenu = () => {
   menuOpen.value = !menuOpen.value;
@@ -200,6 +221,10 @@ const toggleBio3 = () => {
 
 const toggleBio4 = () => {
   bio4Open.value = !bio4Open.value;
+};
+
+const toggleBio5 = () => {
+  bio5Open.value = !bio5Open.value;
 };
 
 const closeMenu = () => {
@@ -445,7 +470,7 @@ html, body {
   gap: 3rem;
 }
 
-.bio1, .bio2, .bio3, .bio4 {
+.bio1, .bio2, .bio3, .bio4, .bio5 {
   width: 100%;
   max-width: 900px;
   height: auto;
@@ -472,6 +497,11 @@ html, body {
 .bio4 {
   margin-right: 0;
   margin-left: auto;
+}
+
+.bio5 {
+  margin-left: 0;
+  margin-right: auto;
 }
 
 .bio-content {
@@ -581,7 +611,7 @@ html, body {
     object-fit: cover;
   }
   
-  .bio1, .bio2, .bio3, .bio4 {
+  .bio1, .bio2, .bio3, .bio4, .bio5 {
     margin: 1rem auto;
   }
 
@@ -626,7 +656,7 @@ html, body {
     display: flex;
   }
   
-  .bio1, .bio2, .bio3, .bio4 {
+  .bio1, .bio2, .bio3, .bio4, .bio5 {
     margin: 0 auto;
   }
 }
@@ -778,7 +808,7 @@ html, body {
     align-items: center;
   }
   
-  .bio1, .bio2, .bio3, .bio4 {
+  .bio1, .bio2, .bio3, .bio4, .bio5 {
     margin-left: 0; /* Remove left margin on mobile */
   }
 }
