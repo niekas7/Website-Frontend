@@ -191,10 +191,17 @@ onMounted(async () => {
         {
           stroke: Cesium.Color.AQUA,
           strokeWidth: 2,
-          clampToGround: true
         }
       );
-      
+
+      // Style country polygons
+      countryWallsDataSource.entities.values.forEach(entity => {
+        if (entity.polygon) {
+          entity.polygon.material = Cesium.Color.TRANSPARENT;
+          entity.polygon.outline = true;
+        }
+      });
+
       // Add the data source to the viewer
       await viewer.dataSources.add(countryWallsDataSource);
       console.log('Country walls loaded successfully');
