@@ -12,7 +12,8 @@
     "copy-cesium": "node copyAssets.cjs"
   },
   "dependencies": {
-    "cesium": "^1.126.0",
+    "@cesium/engine": "^16.0.0",
+    "cesium": "^1.128.0",
     "pinia": "^2.3.1",
     "vite": "^5.4.18",
     "vue": "^3.5.13",

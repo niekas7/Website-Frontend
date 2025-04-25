@@ -13,34 +13,16 @@
     
     <!-- Controls panel -->
     <div class="controls-panel">
-      <button @click="toggleBorders" class="control-btn">
-        {{ showWalls ? 'Slėpti sienas' : 'Rodyti sienas' }}
-      </button>
       <button @click="toggleBuildings" class="control-btn">
         {{ showBuildings ? 'Išjungti pastatus' : 'Įjungti pastatus' }}
       </button>
       <button 
         @click="toggleBuildingType" 
         class="control-btn" 
-        :class="{ 'disabled': !showBuildings }" 
-        :disabled="!showBuildings"
+        :class="{ 'disabled': !showBuildings }"
       >
         {{ useGoogleTiles ? 'Paprasti pastatai' : 'Fotorealistiški pastatai' }}
       </button>
-      <div class="slider-control" :class="{ 'disabled': !showBuildings }">
-        <label for="renderDistance">3d pastatų atstumas:</label>
-        <input 
-          type="range" 
-          id="renderDistance" 
-          min="1000" 
-          max="50000" 
-          step="1000" 
-          v-model="renderDistance" 
-          @input="updateRenderDistance"
-          :disabled="!showBuildings"
-        />
-        <span>{{ Math.round(renderDistance / 1000) }} km</span>
-      </div>
     </div>
     
     <!-- Add loading/error message -->
@@ -56,6 +38,7 @@
 
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
+import * as Cesium from 'cesium';
 
 // Track loading state and errors
 const loadingComplete = ref(false);
@@ -63,57 +46,27 @@ const error = ref(null);
 let viewer = null;
 let countryWallsDataSource = null;
 const showWalls = ref(true);
-const renderDistance = ref(1000); // Default 1km
 const showBuildings = ref(false); // Buildings off by default
 const useGoogleTiles = ref(false); // Use simple buildings (OSM) by default
 let buildingTileset = null;
 let osmBuildingTileset = null;
 
-// Toggle country walls visibility
+// Toggle country walls visibility - optimized
 const toggleBorders = () => {
-  if (!viewer || !viewer.entities || !countryWallsDataSource) return;
-  
-  showWalls.value = !showWalls.value;
-  countryWallsDataSource.show = showWalls.value;
-  
-  // Also toggle any wall entities we added separately
-  const entities = viewer.entities.values;
-  for (let i = 0; i < entities.length; i++) {
-    const entity = entities[i];
-    if (entity.name && entity.name.includes("Wall")) {
-      entity.wall.show = showWalls.value;
-    }
-  }
+  countryWallsDataSource.show = showWalls.value = !showWalls.value;
 };
 
-// Toggle 3D buildings visibility
+// Toggle 3D buildings with memory management
 const toggleBuildings = () => {
-  if (!viewer) return;
-  
   showBuildings.value = !showBuildings.value;
-  
-  // Update visibility for the active tileset
   updateBuildingTilesets();
-  
-  if (showBuildings.value) {
-    // Apply current render distance when re-enabling
-    updateRenderDistance();
-  }
 };
 
 // Toggle between Google 3D Tiles and OSM Buildings
 const toggleBuildingType = () => {
   if (!viewer) return;
-  
   useGoogleTiles.value = !useGoogleTiles.value;
-  
-  // Update visibility for tilesets
   updateBuildingTilesets();
-  
-  if (showBuildings.value) {
-    // Update render distance for the newly active tileset
-    updateRenderDistance();
-  }
 };
 
 // Helper function to update tileset visibility
@@ -121,7 +74,6 @@ const updateBuildingTilesets = () => {
   if (buildingTileset) {
     buildingTileset.show = showBuildings.value && useGoogleTiles.value;
   }
-  
   if (osmBuildingTileset) {
     osmBuildingTileset.show = showBuildings.value && !useGoogleTiles.value;
   }
@@ -163,69 +115,30 @@ const flyToLocation = (location) => {
   }
 };
 
-// Update 3D buildings rendering distance
-const updateRenderDistance = () => {
-  if (!viewer || !showBuildings.value) return;
+// Optimized camera setup
+const initializeCamera = (Cesium) => {
+  viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
+  viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100;
+  viewer.scene.screenSpaceCameraController.maximumZoomDistance = 5000000;
   
-  const activeTileset = useGoogleTiles.value ? buildingTileset : osmBuildingTileset;
-  if (!activeTileset) return;
-  
-  try {
-    const Cesium = window.Cesium;
-    if (!Cesium) return;
-    
-    // Only set the maximum distance at which buildings are visible
-    if (activeTileset.maximumScreenSpaceError) {
-      // Fixed quality setting (not affected by slider)
-      activeTileset.maximumScreenSpaceError = 16;
-    }
-    
-    // Set a custom property for maximum viewing distance
-    if (typeof activeTileset.customMaximumDistance === 'undefined') {
-      // Store original parameters to allow toggling visibility
-      activeTileset.customMaximumDistance = Number(renderDistance.value);
-      
-      // Add event listener to control visibility based on distance
-      if (viewer.scene && viewer.scene.postRender) {
-        viewer.scene.postRender.addEventListener((scene) => {
-          if (!scene.camera || !showBuildings.value) return;
-          
-          try {
-            // Get the active tileset
-            const currentTileset = useGoogleTiles.value ? buildingTileset : osmBuildingTileset;
-            if (!currentTileset || !currentTileset._root || !currentTileset._root.children) return;
-            
-            const cameraPosition = scene.camera.position;
-            const distance = Number(renderDistance.value);
-            
-            // Set custom property based on distance from camera
-            currentTileset.customMaximumDistance = distance;
-            
-            // Apply a simpler approach - hide/show the entire tileset based on camera height
-            const cameraHeight = scene.globe.ellipsoid.cartesianToCartographic(cameraPosition).height;
-            
-            // Only update the active tileset's visibility
-            if (useGoogleTiles.value && buildingTileset) {
-              buildingTileset.show = showBuildings.value && useGoogleTiles.value && cameraHeight < distance * 1.5;
-            } else if (!useGoogleTiles.value && osmBuildingTileset) {
-              osmBuildingTileset.show = showBuildings.value && !useGoogleTiles.value && cameraHeight < distance * 1.5;
-            }
-          } catch (err) {
-            console.warn('Error in post-render event:', err);
-          }
-        });
-      }
-    } else {
-      // Update the custom maximum distance
-      activeTileset.customMaximumDistance = Number(renderDistance.value);
-    }
-    
-    console.log(`Building visibility distance set to: ${renderDistance.value} for ${useGoogleTiles.value ? 'Google' : 'OSM'} tileset`);
-  } catch (err) {
-    console.error('Error updating render distance:', err);
-  }
+  viewer.scene.globe.enableLighting = false;
+  viewer.scene.globe.depthTestAgainstTerrain = false;
+  viewer.scene.fog.enabled = false;
+  viewer.scene.highDynamicRange = false;
 };
 
+// Helper function to set building style
+const setBuildingStyle = (tileset) => {
+  tileset.style = new Cesium.Cesium3DTileStyle({
+    color: {
+      conditions: [
+        ["true", "color('white')"]
+      ]
+    }
+  });
+};
+
+// Optimized viewer initialization
 onMounted(async () => {
   try {
     // Check if Cesium is available globally
@@ -251,90 +164,53 @@ onMounted(async () => {
     }
     
     try {
-      // Create a very simple viewer with error handling
+      // Create viewer with enhanced controls
       viewer = new Cesium.Viewer('cesiumContainer', {
-        baseLayerPicker: true,
-        geocoder: true,
-        homeButton: true,
-        sceneModePicker: true,
-        navigationHelpButton: true,
-        animation: false,  // Disable animation to prevent updating issues
-        timeline: false,   // Disable timeline to prevent updating issues
+        baseLayerPicker: false,      // Enable layer selection
+        geocoder: true,             // Enable search bar
+        homeButton: true,           // Enable home button
+        sceneModePicker: true,      // Enable 2D/3D mode switch
+        navigationHelpButton: true,  // Enable help button
+        animation: false,
+        timeline: false,
         fullscreenButton: true,
-        infoBox: true,
+        infoBox: true,              // Enable entity info boxes
         requestRenderMode: true,
         maximumRenderTimeChange: Infinity,
-        scene3DOnly: true, // Force 3D only mode to avoid 2D projection issues
-        shouldAnimate: false // Disable animation loop
+        scene3DOnly: true,
+        shouldAnimate: false,
+        terrainShadows: Cesium.ShadowMode.DISABLED,
+        shadows: false
       });
-      
-      if (!viewer || !viewer.scene) {
-        throw new Error("Failed to initialize Cesium viewer");
-      }
-      
-      // Add country walls
-      try {
-        // Create a GeoJSON data source for country walls
-        countryWallsDataSource = new Cesium.GeoJsonDataSource('country-walls');
-        
-        // Load country walls from Natural Earth dataset
-        await countryWallsDataSource.load(
-          'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson', 
-          {
-            stroke: Cesium.Color.AQUA,
-            fill: Cesium.Color.TRANSPARENT,
-            strokeWidth: 3,
-            markerSymbol: '',
-            clampToGround: true
-          }
-        );
 
-        // Convert border lines to extruded walls
-        const entities = countryWallsDataSource.entities.values;
-        for (let i = 0; i < entities.length; i++) {
-          const entity = entities[i];
-          if (entity.polygon) {
-            // Create wall effect with no fill
-            entity.polygon.material = Cesium.Color.TRANSPARENT;
-            entity.polygon.outline = true;
-            entity.polygon.outlineColor = Cesium.Color.AQUA.withAlpha(1.0);
-            entity.polygon.outlineWidth = 5;
-            entity.polygon.extrudedHeight = 40; // Set wall height to 40
-            
-            // Add a wall entity using polylines instead of polygon fill
-            if (entity.polygon.hierarchy && entity.name) {
-              try {
-                // Extract positions from polygon hierarchy
-                const positions = entity.polygon.hierarchy.getValue().positions;
-                if (positions && positions.length > 0) {
-                  // Create a wall entity just on the boundary
-                  viewer.entities.add({
-                    name: entity.name + " Wall",
-                    wall: {
-                      positions: positions,
-                      material: Cesium.Color.AQUA.withAlpha(0.7),
-                      outline: true,
-                      outlineColor: Cesium.Color.WHITE,
-                      outlineWidth: 2,
-                      minimumHeights: Array(positions.length).fill(0),
-                      maximumHeights: Array(positions.length).fill(40) // Set wall height to 40
-                    }
-                  });
-                }
-              } catch (err) {
-                console.warn("Failed to add wall for:", entity.name);
-              }
-            }
-          }
-        }
-        
-        // Add the data source to the viewer
-        await viewer.dataSources.add(countryWallsDataSource);
-        console.log('Country walls loaded successfully');
-      } catch (wallsErr) {
-        console.error('Error loading country walls:', wallsErr);
-      }
+      initializeCamera(Cesium);
       
+      // Load simplified country borders (110m instead of 50m)
+      countryWallsDataSource = await Cesium.GeoJsonDataSource.load(
+        'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson',
+        {
+          stroke: Cesium.Color.AQUA,
+          strokeWidth: 2,
+          clampToGround: true
+        }
+      );
+      
+      // Add the data source to the viewer
+      await viewer.dataSources.add(countryWallsDataSource);
+      console.log('Country walls loaded successfully');
+      
+      // Preload both tilesets
+      buildingTileset = await Cesium.Cesium3DTileset.fromIonAssetId(2275207, {
+        maximumScreenSpaceError: 32,
+        show: false // Hidden initially
+      });
+      viewer.scene.primitives.add(buildingTileset);
+
+      osmBuildingTileset = await Cesium.createOsmBuildingsAsync();
+      osmBuildingTileset.maximumScreenSpaceError = 32;
+      osmBuildingTileset.show = false; // Hidden initially  
+      viewer.scene.primitives.add(osmBuildingTileset);
+
       // Set default view to Lithuania with error handling
       try {
         const lithuaniaPosition = Cesium.Cartesian3.fromDegrees(23.8813, 55.1694, 500000);
@@ -344,6 +220,7 @@ onMounted(async () => {
             complete: () => {
               // Only add entities after camera has finished moving
               addKtuMarker(Cesium, viewer);
+              addImageMarker(Cesium, viewer); // Add custom image marker
             }
           });
         }
@@ -351,95 +228,28 @@ onMounted(async () => {
         console.error('Error setting camera position:', cameraErr);
       }
       
-      // Enable terrain - using compatible API with error handling
-      try {
-        if (Cesium.createWorldTerrain) {
-          viewer.terrainProvider = Cesium.createWorldTerrain();
-        } else if (Cesium.WorldTerrainProvider) {
-          viewer.terrainProvider = new Cesium.WorldTerrainProvider();
-        } else if (Cesium.createWorldTerrainAsync) {
-          viewer.terrainProvider = await Cesium.createWorldTerrainAsync();
-        } else if (Cesium.CesiumTerrainProvider) {
-          // Fallback for older versions
-          viewer.terrainProvider = new Cesium.CesiumTerrainProvider({
-            url: Cesium.IonResource.fromAssetId(1)
-          });
-        }
-      } catch (terrainErr) {
-        console.error('Error setting terrain provider:', terrainErr);
-      }
-      
-      // Add 3D buildings using compatible API with error handling
-      try {
-        // Try to load Google Photorealistic 3D Tiles
-        try {
-          // Google Photorealistic 3D Tiles (available through Cesium ion)
-          buildingTileset = await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
-          
-          if (buildingTileset && viewer.scene && viewer.scene.primitives) {
-            viewer.scene.primitives.add(buildingTileset);
-            console.log('Google Photorealistic 3D Tiles loaded successfully');
-          }
-        } catch (googleTilesErr) {
-          console.warn('Error loading Google Photorealistic 3D Tiles:', googleTilesErr);
-          // If Google tiles fail to load, default to OSM
-          useGoogleTiles.value = false;
-        }
-        
-        // Also load OSM Buildings for toggling between types
-        try {
-          if (Cesium.createOsmBuildingsAsync) {
-            osmBuildingTileset = await Cesium.createOsmBuildingsAsync();
-          } else if (Cesium.Cesium3DTileset) {
-            osmBuildingTileset = new Cesium.Cesium3DTileset({
-              url: Cesium.IonResource.fromAssetId(96188)
-            });
-          }
-          
-          if (osmBuildingTileset && viewer.scene && viewer.scene.primitives) {
-            viewer.scene.primitives.add(osmBuildingTileset);
-            console.log('OSM Buildings loaded successfully');
-          }
-        } catch (osmTilesErr) {
-          console.warn('Error loading OSM Buildings:', osmTilesErr);
-          // If OSM tiles fail to load and Google tiles already failed, no buildings will be available
-          if (!buildingTileset) {
-            console.error('Both building tilesets failed to load');
-          }
-        }
-        
-        // Set initial visibility based on settings
-        updateBuildingTilesets();
-        
-        // Set initial render distance (only if buildings are shown)
-        if (showBuildings.value) {
-          updateRenderDistance();
-        }
-      } catch (buildingErr) {
-        console.error('Error loading 3D buildings:', buildingErr);
+      loadingComplete.value = true;
+
+      if (buildingTileset) {
+        setBuildingStyle(buildingTileset);
       }
     } catch (viewerErr) {
       console.error('Error creating Cesium viewer:', viewerErr);
       error.value = viewerErr.toString();
       return;
     }
-    
-    loadingComplete.value = true;
   } catch (err) {
     console.error('Error initializing Cesium viewer:', err);
     error.value = err.toString();
   }
 });
 
+// Optimized entity cleanup
 onUnmounted(() => {
-  // Clean up Cesium viewer when component is destroyed
   if (viewer) {
-    try {
-      viewer.destroy();
-      viewer = null;
-    } catch (e) {
-      console.error('Error destroying viewer:', e);
-    }
+    viewer.entities.removeAll();
+    viewer.scene.primitives.removeAll();
+    viewer.destroy();
   }
 });
 
@@ -471,6 +281,49 @@ const addKtuMarker = (Cesium, viewer) => {
     console.error('Error adding KTU marker:', markerErr);
   }
 };
+
+
+
+// Add custom image marker at specific coordinates
+const addImageMarker = (Cesium, viewer) => {
+  try {
+    // Hardcoded coordinates (replace with your desired location)
+    const longitude = 23.95049;  // Example: near Kaunas
+    const latitude = 54.92444;
+    
+    if (typeof longitude === 'number' && typeof latitude === 'number' && 
+        !isNaN(longitude) && !isNaN(latitude)) {
+      const position = Cesium.Cartesian3.fromDegrees(longitude, latitude);
+      
+      if (position && viewer.entities) {
+        // Add billboard entity with image
+        viewer.entities.add({
+          position: position,
+          billboard: {
+            image: '/Kristupas.png',
+            width: 64,
+            height: 64,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            scale: 1.0
+          },
+          label: {
+            text: 'Kristupas',
+            font: '14pt sans-serif',
+            pixelOffset: new Cesium.Cartesian2(0, -70),  // Offset label below image
+            fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE
+          }
+        });
+        
+        console.log('Image marker added successfully');
+      }
+    }
+  } catch (imageMarkerErr) {
+    console.error('Error adding image marker:', imageMarkerErr);
+  }
+};
 </script>
 
 <style>
@@ -493,6 +346,8 @@ const addKtuMarker = (Cesium, viewer) => {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  will-change: transform;
+  contain: strict;
 }
 
 .track-nav {
@@ -562,6 +417,10 @@ const addKtuMarker = (Cesium, viewer) => {
   display: block !important;
 }
 
+.cesium-widget-credits {
+  display: none !important;
+}
+
 /* Add location selector styling */
 .location-selector {
   position: absolute;
@@ -587,6 +446,8 @@ const addKtuMarker = (Cesium, viewer) => {
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .location-btn:hover {
@@ -618,6 +479,8 @@ const addKtuMarker = (Cesium, viewer) => {
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .control-btn:hover {
@@ -628,57 +491,4 @@ const addKtuMarker = (Cesium, viewer) => {
   opacity: 0.5;
   pointer-events: none;
 }
-
-/* Slider control styling */
-.slider-control {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.slider-control.disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.slider-control label {
-  color: white;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.85rem;
-}
-
-.slider-control input[type="range"] {
-  width: 100%;
-  height: 8px;
-  -webkit-appearance: none;
-  background: #1e293b;
-  border-radius: 4px;
-  outline: none;
-}
-
-.slider-control input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #2563eb;
-  cursor: pointer;
-}
-
-.slider-control input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #2563eb;
-  cursor: pointer;
-  border: none;
-}
-
-.slider-control span {
-  color: white;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.8rem;
-  text-align: center;
-}
-</style> 
+</style>
