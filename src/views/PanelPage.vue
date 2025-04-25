@@ -49,8 +49,41 @@
       <!-- Main content -->
       <div class="content-wrapper">
         <section class="panel-content">
-          <h1 class="panel-title">Panel</h1>
-          <!-- Panel content will go here -->
+          <h1 class="panel-title">Control Panel</h1>
+          
+          <div class="control-section">
+            <h2 class="section-title">Kristupas Marker Location</h2>
+            
+            <div class="coordinates-control">
+              <div class="coordinate-input">
+                <label for="longitude">Longitude:</label>
+                <input 
+                  type="number" 
+                  id="longitude" 
+                  v-model="longitude" 
+                  step="0.00001"
+                  placeholder="Enter longitude"
+                />
+              </div>
+              
+              <div class="coordinate-input">
+                <label for="latitude">Latitude:</label>
+                <input 
+                  type="number" 
+                  id="latitude" 
+                  v-model="latitude" 
+                  step="0.00001"
+                  placeholder="Enter latitude"
+                />
+              </div>
+
+              <button @click="updateMarkerPosition" class="update-btn">Update Position</button>
+            </div>
+            
+            <div class="current-position">
+              <p>Current position: {{ displayedLongitude }}, {{ displayedLatitude }}</p>
+            </div>
+          </div>
         </section>
       </div>
     </div>
@@ -58,9 +91,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 
 const menuOpen = ref(false);
+const longitude = ref(23.93394);  // Default longitude
+const latitude = ref(54.88637);   // Default latitude
+const displayedLongitude = ref(longitude.value);
+const displayedLatitude = ref(latitude.value);
 
 const toggleMenu = () => {
   menuOpen.value = !menuOpen.value;
@@ -69,6 +106,45 @@ const toggleMenu = () => {
 const closeMenu = () => {
   menuOpen.value = false;
 };
+
+const updateMarkerPosition = () => {
+  // Store the new coordinates in localStorage
+  localStorage.setItem('kristupasMarkerPosition', JSON.stringify({
+    longitude: longitude.value,
+    latitude: latitude.value,
+    timestamp: Date.now() // Add timestamp to force update
+  }));
+  
+  // Update displayed values
+  displayedLongitude.value = longitude.value;
+  displayedLatitude.value = latitude.value;
+  
+  // Dispatch a custom event that will be detected even in the same window
+  window.dispatchEvent(new CustomEvent('kristupasMarkerUpdated', {
+    detail: {
+      longitude: longitude.value,
+      latitude: latitude.value
+    }
+  }));
+  
+  console.log(`Marker position updated to: ${longitude.value}, ${latitude.value}`);
+};
+
+onMounted(() => {
+  // Check if there are saved coordinates in localStorage
+  const savedPosition = localStorage.getItem('kristupasMarkerPosition');
+  if (savedPosition) {
+    try {
+      const position = JSON.parse(savedPosition);
+      longitude.value = position.longitude;
+      latitude.value = position.latitude;
+      displayedLongitude.value = longitude.value;
+      displayedLatitude.value = latitude.value;
+    } catch (error) {
+      console.error('Error parsing saved position:', error);
+    }
+  }
+});
 </script>
 
 <style>
@@ -256,5 +332,78 @@ const closeMenu = () => {
   pointer-events: none;
   touch-action: none;
   user-select: none;
+}
+
+/* New styles for the coordinate control section */
+.control-section {
+  background-color: rgba(30, 41, 59, 0.8);
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  width: 90%;
+  max-width: 600px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.section-title {
+  color: #2563eb;
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.coordinates-control {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.coordinate-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.coordinate-input label {
+  color: white;
+  font-size: 1rem;
+}
+
+.coordinate-input input {
+  padding: 0.75rem;
+  border-radius: 4px;
+  border: 1px solid #3b82f6;
+  background-color: rgba(15, 23, 42, 0.7);
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.update-btn {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.update-btn:hover {
+  background-color: #1d4ed8;
+}
+
+.current-position {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.current-position p {
+  color: white;
+  font-size: 0.9rem;
+  text-align: center;
 }
 </style>

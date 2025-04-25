@@ -9,6 +9,7 @@
     <div class="location-selector">
       <button @click="flyToLocation('kaunas')" class="location-btn">Kaunas</button>
       <button @click="flyToLocation('moletai')" class="location-btn">Molėtai</button>
+      <button @click="flyToKristupas()" class="location-btn kristupas-btn">Real life kristupas location 100% real</button>
     </div>
     
     <!-- Controls panel -->
@@ -50,6 +51,12 @@ const showBuildings = ref(false); // Buildings off by default
 const useGoogleTiles = ref(false); // Use simple buildings (OSM) by default
 let buildingTileset = null;
 let osmBuildingTileset = null;
+
+// Add these variables to your existing refs
+const cameraState = ref(null);
+const restorePosition = ref(false);
+const refreshInterval = 5 * 60 * 1000; // 5 minutes in milliseconds
+let refreshTimer = null;
 
 // Toggle country walls visibility - optimized
 const toggleBorders = () => {
@@ -115,6 +122,58 @@ const flyToLocation = (location) => {
   }
 };
 
+// Function to fly to Kristupas marker
+const flyToKristupas = () => {
+  if (!viewer) return;
+  
+  const Cesium = window.Cesium;
+  if (!Cesium) return;
+  
+  try {
+    // Get Kristupas coordinates from localStorage
+    let longitude = 23.93394;  // Default: near Kaunas
+    let latitude = 54.88637;   // Default
+    
+    const savedPosition = localStorage.getItem('kristupasMarkerPosition');
+    if (savedPosition) {
+      try {
+        const position = JSON.parse(savedPosition);
+        if (position && typeof position.longitude === 'number' && typeof position.latitude === 'number') {
+          longitude = position.longitude;
+          latitude = position.latitude;
+        }
+      } catch (err) {
+        console.error('Error parsing saved marker position:', err);
+      }
+    }
+    
+    console.log('Flying to view of Lithuania with Kristupas visible');
+    
+    // Set camera to center of Lithuania with marker still visible
+    const lithuaniaCenterLongitude = 23.8813; // Approximate center of Lithuania
+    const lithuaniaCenterLatitude = 55.1694;
+    
+    // Very high altitude to see most of Lithuania
+    const destination = Cesium.Cartesian3.fromDegrees(lithuaniaCenterLongitude, lithuaniaCenterLatitude, 300000);
+    
+    // Simple top-down view without rotation
+    const orientation = {
+      heading: Cesium.Math.toRadians(0),
+      pitch: Cesium.Math.toRadians(-90), // Directly looking down
+      roll: 0
+    };
+    
+    // Fly to panoramic position
+    viewer.camera.flyTo({
+      destination: destination,
+      orientation: orientation,
+      duration: 3
+    });
+  } catch (flyErr) {
+    console.error('Error flying to panoramic view:', flyErr);
+  }
+};
+
 // Optimized camera setup
 const initializeCamera = (Cesium) => {
   viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
@@ -136,6 +195,179 @@ const setBuildingStyle = (tileset) => {
       ]
     }
   });
+};
+
+// Add this function to save camera state
+const saveCameraState = () => {
+  if (!viewer) return;
+  
+  const camera = viewer.camera;
+  cameraState.value = {
+    position: camera.position.clone(),
+    heading: camera.heading,
+    pitch: camera.pitch,
+    roll: camera.roll,
+    buildingTilesetVisible: buildingTileset?.show || false,
+    osmBuildingTilesetVisible: osmBuildingTileset?.show || false
+  };
+
+  // Store in localStorage
+  localStorage.setItem('cameraState', JSON.stringify({
+    position: {
+      x: camera.position.x,
+      y: camera.position.y,
+      z: camera.position.z
+    },
+    heading: camera.heading,
+    pitch: camera.pitch,
+    roll: camera.roll,
+    buildingTilesetVisible: buildingTileset?.show || false,
+    osmBuildingTilesetVisible: osmBuildingTileset?.show || false,
+    timestamp: Date.now()
+  }));
+
+  // Reload the page
+  window.location.reload();
+};
+
+// Add this function to restore camera state
+const restoreCameraState = () => {
+  if (!viewer) return;
+  
+  try {
+    const savedState = localStorage.getItem('cameraState');
+    if (!savedState) return;
+
+    const state = JSON.parse(savedState);
+    const timestamp = state.timestamp;
+
+    // Only restore if saved within last 10 minutes
+    if (Date.now() - timestamp > 10 * 60 * 1000) {
+      localStorage.removeItem('cameraState');
+      return;
+    }
+
+    const position = new Cesium.Cartesian3(
+      state.position.x,
+      state.position.y,
+      state.position.z
+    );
+
+    viewer.camera.setView({
+      destination: position,
+      orientation: {
+        heading: state.heading,
+        pitch: state.pitch,
+        roll: state.roll
+      }
+    });
+
+    // Restore tileset visibility
+    if (buildingTileset) {
+      buildingTileset.show = state.buildingTilesetVisible;
+    }
+    if (osmBuildingTileset) {
+      osmBuildingTileset.show = state.osmBuildingTilesetVisible;
+    }
+
+    // Clear saved state
+    localStorage.removeItem('cameraState');
+  } catch (error) {
+    console.error('Error restoring camera state:', error);
+  }
+};
+
+// Simple function to remove all Kristupas markers
+const removeAllKristupasMarkers = (viewer) => {
+  if (!viewer || !viewer.entities) return;
+  
+  console.log('Removing all Kristupas-related entities');
+  
+  // Most direct method - completely remove all entities and re-add only non-Kristupas ones
+  const entitiesToKeep = [];
+  const entitiesToRemove = [];
+  
+  viewer.entities.values.forEach(entity => {
+    // Check if this entity is related to Kristupas in any way
+    if (entity && 
+        ((entity.label && entity.label.text === 'Kristupas') || 
+         (entity.billboard && entity.billboard.image && entity.billboard.image.getValue && 
+          entity.billboard.image.getValue().includes && 
+          entity.billboard.image.getValue().includes('Kristupas')))) {
+      
+      entitiesToRemove.push(entity);
+    } else {
+      // Only keep non-Kristupas entities
+      entitiesToKeep.push(entity);
+    }
+  });
+  
+  // Remove all Kristupas entities first
+  entitiesToRemove.forEach(entity => {
+    try {
+      viewer.entities.remove(entity);
+    } catch (e) {
+      console.error('Error removing entity:', e);
+    }
+  });
+  
+  console.log(`Removed ${entitiesToRemove.length} Kristupas-related entities`);
+  
+  // Nuclear option - if there are still Kristupas entities, remove all and re-add non-Kristupas
+  let remaining = 0;
+  viewer.entities.values.forEach(entity => {
+    if (entity && entity.label && entity.label.text === 'Kristupas') {
+      remaining++;
+    }
+  });
+  
+  if (remaining > 0) {
+    console.log(`Still found ${remaining} Kristupas entities, using nuclear option`);
+    
+    // Save non-Kristupas entities
+    const backupEntities = [];
+    viewer.entities.values.forEach(entity => {
+      if (entity && 
+          !(entity.label && entity.label.text === 'Kristupas') && 
+          !(entity.billboard && entity.billboard.image && 
+            entity.billboard.image.getValue && 
+            entity.billboard.image.getValue().includes && 
+            entity.billboard.image.getValue().includes('Kristupas'))) {
+        
+        // Create minimal backup of essential properties
+        const backup = {
+          position: entity.position
+        };
+        
+        if (entity.point) {
+          backup.point = {
+            pixelSize: entity.point.pixelSize,
+            color: entity.point.color
+          };
+        }
+        
+        if (entity.label) {
+          backup.label = {
+            text: entity.label.text,
+            font: entity.label.font
+          };
+        }
+        
+        backupEntities.push(backup);
+      }
+    });
+    
+    // Remove all entities
+    viewer.entities.removeAll();
+    console.log('Removed ALL entities');
+    
+    // Re-add non-Kristupas entities
+    backupEntities.forEach(data => {
+      viewer.entities.add(data);
+    });
+    
+    console.log(`Re-added ${backupEntities.length} non-Kristupas entities`);
+  }
 };
 
 // Optimized viewer initialization
@@ -226,8 +458,11 @@ onMounted(async () => {
             destination: lithuaniaPosition,
             complete: () => {
               // Only add entities after camera has finished moving
+              console.log('Camera movement complete, adding markers');
               addKtuMarker(Cesium, viewer);
-              addImageMarker(Cesium, viewer); // Add custom image marker
+              
+              // Add the Kristupas marker (the function handles removing any existing markers)
+              addImageMarker(Cesium, viewer);
             }
           });
         }
@@ -240,6 +475,30 @@ onMounted(async () => {
       if (buildingTileset) {
         setBuildingStyle(buildingTileset);
       }
+
+      // Start refresh timer
+      refreshTimer = setInterval(saveCameraState, refreshInterval);
+
+      // Restore camera position if available
+      restoreCameraState();
+      
+      // Add event listener for storage changes to update marker position in real-time
+      window.addEventListener('storage', (event) => {
+        if (event.key === 'kristupasMarkerPosition' && viewer) {
+          console.log('Storage event detected, updating marker position');
+          // The addImageMarker function now handles removing old markers first
+          addImageMarker(Cesium, viewer);
+        }
+      });
+      
+      // Add a custom event listener for more reliable updates (especially in the same window)
+      window.addEventListener('kristupasMarkerUpdated', (event) => {
+        console.log('Custom event detected, updating marker position');
+        if (viewer) {
+          // The addImageMarker function now handles removing old markers first
+          addImageMarker(Cesium, viewer);
+        }
+      });
     } catch (viewerErr) {
       console.error('Error creating Cesium viewer:', viewerErr);
       error.value = viewerErr.toString();
@@ -253,6 +512,9 @@ onMounted(async () => {
 
 // Optimized entity cleanup
 onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+  }
   if (viewer) {
     viewer.entities.removeAll();
     viewer.scene.primitives.removeAll();
@@ -289,22 +551,48 @@ const addKtuMarker = (Cesium, viewer) => {
   }
 };
 
-
-
 // Add custom image marker at specific coordinates
 const addImageMarker = (Cesium, viewer) => {
   try {
-    // Hardcoded coordinates (replace with your desired location)
-    const longitude = 23.95049;  // Example: near Kaunas
-    const latitude = 54.92444;
+    if (!viewer || !viewer.entities) {
+      console.error('Viewer not initialized');
+      return;
+    }
+    
+    // Make absolutely sure no Kristupas entities exist before adding new one
+    removeAllKristupasMarkers(viewer);
+    
+    // Get coordinates from localStorage if available, otherwise use defaults
+    let longitude = 23.93394;  // Default: near Kaunas
+    let latitude = 54.88637;   // Default
+    
+    const savedPosition = localStorage.getItem('kristupasMarkerPosition');
+    if (savedPosition) {
+      try {
+        const position = JSON.parse(savedPosition);
+        if (position && typeof position.longitude === 'number' && typeof position.latitude === 'number') {
+          longitude = position.longitude;
+          latitude = position.latitude;
+        }
+      } catch (err) {
+        console.error('Error parsing saved marker position:', err);
+      }
+    }
     
     if (typeof longitude === 'number' && typeof latitude === 'number' && 
         !isNaN(longitude) && !isNaN(latitude)) {
+      
+      // Create the Cartesian3 position
       const position = Cesium.Cartesian3.fromDegrees(longitude, latitude);
       
-      if (position && viewer.entities) {
+      if (position) {
+        // Create a unique ID for this marker
+        const entityId = 'kristupas-' + Date.now();
+        
         // Add billboard entity with image
-        viewer.entities.add({
+        const entity = viewer.entities.add({
+          id: entityId,
+          name: 'Kristupas Marker',
           position: position,
           billboard: {
             image: '/Kristupas.png',
@@ -324,7 +612,7 @@ const addImageMarker = (Cesium, viewer) => {
           }
         });
         
-        console.log('Image marker added successfully');
+        console.log('Image marker added at:', longitude, latitude, 'with ID:', entityId);
       }
     }
   } catch (imageMarkerErr) {
@@ -459,6 +747,26 @@ const addImageMarker = (Cesium, viewer) => {
 
 .location-btn:hover {
   background-color: #2563eb;
+}
+
+/* Special styling for the Kristupas button */
+.kristupas-btn {
+  background-color: #4f46e5;
+  color: #ffff00;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+  white-space: nowrap;
+}
+
+.kristupas-btn:hover {
+  background-color: #7c3aed;
+  transform: scale(1.05);
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
 }
 
 /* Controls panel styling */
