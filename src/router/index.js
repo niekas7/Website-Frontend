@@ -3,6 +3,8 @@ import HomePage from '../views/HomePage.vue'
 import TrackPage from '../views/TrackPage.vue'
 import PanelPage from '../views/PanelPage.vue'
 import ForbiddenPage from '../views/ForbiddenPage.vue'
+import ObjectPage from '../views/ObjectPage.vue'
+
 const routes = [
   {
     path: '/',
@@ -18,6 +20,11 @@ const routes = [
     path: '/panel',
     name: 'Panel',
     component: PanelPage
+  },
+  {
+    path: '/3d',
+    name: '3d',
+    component: ObjectPage
   },
   {
     path: '/403',
