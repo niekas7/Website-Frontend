@@ -90,8 +90,11 @@
                 />
               </div>
 
-              <button @click="updateMarkerPosition" class="update-btn">Update Position</button>
-              <button @click="clearAllMarkers" class="clear-btn">Clear All Markers</button>
+              <div class="button-group">
+                <button @click="updateMarkerPosition" class="update-btn">Update Position</button>
+                <button @click="addNewMarker" class="add-btn">Add New Marker</button>
+                <button @click="clearAllMarkers" class="clear-btn">Clear All Markers</button>
+              </div>
             </div>
             
             <div class="current-position">
@@ -108,8 +111,8 @@
 import { ref, onMounted } from 'vue';
 
 const menuOpen = ref(false);
-const longitude = ref(23.93394);  // Default longitude
-const latitude = ref(54.88637);   // Default latitude
+const longitude = ref(24);  // Default longitude
+const latitude = ref(55);   // Default latitude
 const height = ref(0);
 const displayedLongitude = ref(longitude.value);
 const displayedLatitude = ref(latitude.value);
@@ -123,47 +126,148 @@ const closeMenu = () => {
 };
 
 const updateMarkerPosition = () => {
-  // Store the new coordinates in localStorage
+  // Find and update the latest marker in the allMarkers array
+  let markers = [];
+  const savedMarkers = localStorage.getItem('allMarkers');
+  
+  if (savedMarkers) {
+    try {
+      markers = JSON.parse(savedMarkers);
+      
+      if (markers.length > 0) {
+        // Sort markers by timestamp if available, to find the latest one
+        markers.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        
+        // Update the latest marker's position
+        markers[0].longitude = longitude.value;
+        markers[0].latitude = latitude.value;
+        markers[0].height = height.value;
+        markers[0].timestamp = Date.now(); // Update timestamp
+        
+        // Save the updated markers back to localStorage
+        localStorage.setItem('allMarkers', JSON.stringify(markers));
+        
+        // Also update kristupasMarkerPosition for backward compatibility only
+        localStorage.setItem('kristupasMarkerPosition', JSON.stringify({
+          longitude: longitude.value,
+          latitude: latitude.value,
+          height: height.value,
+          timestamp: Date.now()
+        }));
+        
+        console.log(`Updated latest marker (${markers[0].id}) position to:`, 
+          longitude.value, latitude.value, height.value);
+          
+        // Update displayed values
+        displayedLongitude.value = longitude.value;
+        displayedLatitude.value = latitude.value;
+        
+        // Dispatch a custom event to notify TrackPage
+        window.dispatchEvent(new CustomEvent('markerUpdated', {
+          detail: {
+            id: markers[0].id,
+            longitude: longitude.value,
+            latitude: latitude.value,
+            height: height.value
+          }
+        }));
+      } else {
+        // No markers exist
+        console.log('No markers exist to update. Please add a marker first.');
+        alert('No markers exist. Please add a marker first.');
+      }
+    } catch (err) {
+      console.error('Error updating marker position:', err);
+    }
+  } else {
+    // No markers exist
+    console.log('No markers exist to update. Please add a marker first.');
+    alert('No markers exist. Please add a marker first.');
+  }
+};
+
+const addNewMarker = () => {
+  // Generate a unique ID for this marker
+  const markerId = 'marker_' + Date.now();
+  
+  // Get current markers from localStorage
+  let markers = [];
+  const savedMarkers = localStorage.getItem('allMarkers');
+  if (savedMarkers) {
+    try {
+      markers = JSON.parse(savedMarkers);
+      if (!Array.isArray(markers)) {
+        markers = [];
+      }
+    } catch (err) {
+      console.error('Error parsing saved markers:', err);
+      markers = [];
+    }
+  }
+  
+  // Create new marker object
+  const newMarker = {
+    id: markerId,
+    longitude: longitude.value,
+    latitude: latitude.value,
+    height: height.value,
+    timestamp: Date.now()
+  };
+  
+  // Add new marker
+  markers.push(newMarker);
+  
+  // Save updated list back to localStorage
+  localStorage.setItem('allMarkers', JSON.stringify(markers));
+  
+  // Also update the kristupasMarkerPosition for backward compatibility only
   localStorage.setItem('kristupasMarkerPosition', JSON.stringify({
     longitude: longitude.value,
     latitude: latitude.value,
     height: height.value,
-    timestamp: Date.now() // Add timestamp to force update
+    timestamp: Date.now()
   }));
   
   // Update displayed values
   displayedLongitude.value = longitude.value;
   displayedLatitude.value = latitude.value;
   
-  // Dispatch a custom event that will be detected even in the same window
-  window.dispatchEvent(new CustomEvent('kristupasMarkerUpdated', {
+  // Dispatch a custom event to notify TrackPage to add the marker
+  window.dispatchEvent(new CustomEvent('markerAdded', {
     detail: {
+      id: markerId,
       longitude: longitude.value,
       latitude: latitude.value,
       height: height.value
     }
   }));
   
-  console.log(`Marker position updated to: ${longitude.value}, ${latitude.value}, ${height.value}`);
+  console.log(`New marker added at: ${longitude.value}, ${latitude.value}, ${height.value}`);
 };
 
 const clearAllMarkers = () => {
-  // Clear the localStorage
+  // Clear ALL marker data from localStorage
   localStorage.removeItem('kristupasMarkerPosition');
+  localStorage.removeItem('allMarkers');
   
   // Reset form values to defaults
-  longitude.value = 23.93394;
-  latitude.value = 54.88637;
+  longitude.value = 24;
+  latitude.value = 55;
   height.value = 0;
   
   // Update displayed values
   displayedLongitude.value = longitude.value;
   displayedLatitude.value = latitude.value;
   
-  // Dispatch a custom event to notify TrackPage to clear markers
-  window.dispatchEvent(new CustomEvent('markersCleared'));
+  // Dispatch a custom event to notify TrackPage to clear ALL markers
+  window.dispatchEvent(new CustomEvent('markersCleared', {
+    detail: {
+      clearAll: true,
+      removeLatestPosition: true // Signal to clear latestMarkerPosition too
+    }
+  }));
   
-  console.log('All markers cleared');
+  console.log('All markers cleared completely');
 };
 
 onMounted(() => {
@@ -174,12 +278,18 @@ onMounted(() => {
       const position = JSON.parse(savedPosition);
       longitude.value = position.longitude;
       latitude.value = position.latitude;
-      height.value = position.height;
+      height.value = position.height || 0;
       displayedLongitude.value = longitude.value;
       displayedLatitude.value = latitude.value;
     } catch (error) {
       console.error('Error parsing saved position:', error);
+      // Do not save default values to localStorage on error
     }
+  } else {
+    // Set default values for the form fields only, but don't save to localStorage
+    displayedLongitude.value = longitude.value;
+    displayedLatitude.value = latitude.value;
+    console.log('No saved marker position, using default values for the form only.');
   }
 });
 </script>
@@ -415,8 +525,15 @@ onMounted(() => {
   font-family: 'Orbitron', sans-serif;
 }
 
-.update-btn, .clear-btn {
-  margin-top: 1rem;
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.update-btn, .clear-btn, .add-btn {
+  margin-top: 0.5rem;
   padding: 0.75rem 1.5rem;
   color: white;
   border: none;
@@ -429,15 +546,23 @@ onMounted(() => {
 
 .update-btn {
   background-color: #2563eb;
+  margin-top: 1rem;
 }
 
 .update-btn:hover {
   background-color: #1d4ed8;
 }
 
+.add-btn {
+  background-color: #10b981;
+}
+
+.add-btn:hover {
+  background-color: #059669;
+}
+
 .clear-btn {
   background-color: #dc2626;
-  margin-top: 0.5rem;
 }
 
 .clear-btn:hover {

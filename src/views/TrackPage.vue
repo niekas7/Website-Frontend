@@ -59,8 +59,12 @@ const restorePosition = ref(false);
 const refreshInterval = 5 * 60 * 1000; // 5 minutes in milliseconds
 let refreshTimer = null;
 
-// Add state to track the latest marker position
+// Add state to track the latest marker position and all markers
 const latestMarkerPosition = ref(null);
+const allMarkers = ref([]);
+
+// Add state to track if camera is locked facing a marker
+const cameraLockedOnMarker = ref(false);
 
 // Toggle country walls visibility - optimized
 const toggleBorders = () => {
@@ -98,6 +102,9 @@ const flyToLocation = (location) => {
   if (!Cesium) return;
   
   try {
+    // Reset camera lock state when flying to a location
+    cameraLockedOnMarker.value = false;
+    
     let destination;
     let orientation = {
       heading: Cesium.Math.toRadians(0),
@@ -115,6 +122,9 @@ const flyToLocation = (location) => {
       default:
         destination = Cesium.Cartesian3.fromDegrees(23.8813, 55.1694, 500000);
     }
+    
+    // Clear any camera constraint before flying
+    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
     
     viewer.camera.flyTo({
       destination: destination,
@@ -134,10 +144,13 @@ const flyToLithuania = () => {
   if (!Cesium) return;
   
   try {
+    // Reset camera lock state when flying to Lithuania
+    cameraLockedOnMarker.value = false;
+    
     // Get Kristupas coordinates from localStorage
-    let longitude = 23.93394;  // Default: near Kaunas
-    let latitude = 54.88637;   // Default
-    let height = 0;            // Default height
+    let longitude = 24;  // Default: near Kaunas
+    let latitude = 55;   // Default
+    let height = 0;      // Default height
     
     const savedPosition = localStorage.getItem('kristupasMarkerPosition');
     if (savedPosition) {
@@ -170,6 +183,9 @@ const flyToLithuania = () => {
       roll: 0
     };
     
+    // Clear any camera constraint before flying
+    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+    
     // Fly to panoramic position
     viewer.camera.flyTo({
       destination: destination,
@@ -193,8 +209,11 @@ const flyToRocket = () => {
     if (latestMarkerPosition.value) {
       const { longitude, latitude, height = 0 } = latestMarkerPosition.value;
       
+      // Set camera lock state to true since we're focusing on the marker
+      cameraLockedOnMarker.value = true;
+      
       // Calculate a position that's offset from the marker
-      // Move camera south by 0.02 degrees and higher
+      // Move camera south by 0.01 degrees and higher
       const cameraLongitude = longitude;
       const cameraLatitude = latitude - 0.01;
       const cameraHeight = height + 1200;
@@ -213,53 +232,24 @@ const flyToRocket = () => {
         duration: 3,
         complete: function() {
           // After flight completes, point the camera directly at the marker
-          const markerPosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
-          viewer.camera.lookAt(
-            markerPosition,
-            new Cesium.HeadingPitchRange(
-              Cesium.Math.toRadians(0),
-              Cesium.Math.toRadians(-30),
-              1500  // Reduced distance from 2000 to 1500 meters
-            )
-          );
+          if (cameraLockedOnMarker.value) { // Only if still locked
+            const markerPosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
+            viewer.camera.lookAt(
+              markerPosition,
+              new Cesium.HeadingPitchRange(
+                Cesium.Math.toRadians(0),
+                Cesium.Math.toRadians(-30),
+                1500  // Distance in meters from the target
+              )
+            );
+          }
         }
       });
       
       console.log('Flying to rocket position with offset:', cameraLongitude, cameraLatitude, cameraHeight);
     } else {
-      console.log('No rocket position available');
-      // If no latest marker, fly to default KTU position as fallback
-      const ktuLongitude = 23.93599878655166;
-      const ktuLatitude = 54.92015109753495;
-      
-      // Add offset to KTU fallback as well
-      const cameraLongitude = ktuLongitude;
-      const cameraLatitude = ktuLatitude - 0.01;
-      const cameraHeight = 1200;
-      
-      const destination = Cesium.Cartesian3.fromDegrees(cameraLongitude, cameraLatitude, cameraHeight);
-      
-      viewer.camera.flyTo({
-        destination: destination,
-        orientation: {
-          heading: Cesium.Math.toRadians(0),
-          pitch: Cesium.Math.toRadians(-30),
-          roll: 0
-        },
-        duration: 3,
-        complete: function() {
-          // Point at KTU after arrival
-          const ktuPosition = Cesium.Cartesian3.fromDegrees(ktuLongitude, ktuLatitude, 0);
-          viewer.camera.lookAt(
-            ktuPosition,
-            new Cesium.HeadingPitchRange(
-              Cesium.Math.toRadians(0),
-              Cesium.Math.toRadians(-30),
-              1500  // Reduced distance from 2000 to 1500 meters
-            )
-          );
-        }
-      });
+      console.log('No marker position available for Rocket button');
+      alert('No markers available. Please add a marker first.');
     }
   } catch (error) {
     console.error('Error flying to rocket position:', error);
@@ -369,33 +359,39 @@ const restoreCameraState = () => {
   }
 };
 
-// Simple function to remove all Kristupas markers
+// Simple function to remove all markers
 const removeAllKristupasMarkers = (viewer) => {
   if (!viewer || !viewer.entities) return;
   
-  console.log('Removing all Kristupas-related entities');
+  console.log('Removing ALL marker entities');
   
-  // Most direct method - completely remove all entities and re-add only non-Kristupas ones
+  // Completely remove all entities except for the essential ones like KTU marker
   const entitiesToKeep = [];
   const entitiesToRemove = [];
   
   viewer.entities.values.forEach(entity => {
-    // Check if this entity is related to Kristupas in any way
+    // Check if this entity is a marker or related entity (more comprehensive check)
     if (entity && 
-        ((entity.label && entity.label.text === 'Kristupas') || 
-         (entity.billboard && entity.billboard.image && entity.billboard.image.getValue && 
-          entity.billboard.image.getValue().includes && 
-          entity.billboard.image.getValue().includes('Kristupas')) ||
-         (entity.id && entity.id.includes && entity.id.includes('kristupas-height-box')))) {
+        // Any text label that's not explicitly "KTU"
+        ((entity.label && entity.label.text && entity.label.text !== 'KTU') || 
+         // Any entity with a billboard
+         entity.billboard || 
+         // Any entity with an ID containing marker-related terms
+         (entity.id && entity.id.includes && 
+          (entity.id.includes('marker') || 
+           entity.id.includes('kristupas') || 
+           entity.id.includes('height-box'))) ||
+         // Any box entity (height indicators)
+         entity.box)) {
       
       entitiesToRemove.push(entity);
     } else {
-      // Only keep non-Kristupas entities
+      // Only keep essential non-marker entities (like KTU marker)
       entitiesToKeep.push(entity);
     }
   });
   
-  // Remove all Kristupas entities first
+  // Remove all marker entities
   entitiesToRemove.forEach(entity => {
     try {
       viewer.entities.remove(entity);
@@ -404,31 +400,36 @@ const removeAllKristupasMarkers = (viewer) => {
     }
   });
   
-  console.log(`Removed ${entitiesToRemove.length} Kristupas-related entities`);
+  console.log(`Removed ${entitiesToRemove.length} marker-related entities`);
   
-  // Nuclear option - if there are still Kristupas entities, remove all and re-add non-Kristupas
+  // Nuclear option - if there are still entities that look like markers, use removeAll
   let remaining = 0;
   viewer.entities.values.forEach(entity => {
     if (entity && 
-        ((entity.label && entity.label.text === 'Kristupas') ||
-         (entity.id && entity.id.includes && entity.id.includes('kristupas-height-box')))) {
+        ((entity.billboard) || 
+         (entity.label && entity.label.text && entity.label.text !== 'KTU') ||
+         entity.box)) {
       remaining++;
     }
   });
   
   if (remaining > 0) {
-    console.log(`Still found ${remaining} Kristupas entities, using nuclear option`);
+    console.log(`Still found ${remaining} potential marker entities, using nuclear option`);
     
-    // Save non-Kristupas entities
+    // Save essential non-marker entities
     const backupEntities = [];
     viewer.entities.values.forEach(entity => {
+      // Only save the KTU marker and non-marker entities
       if (entity && 
-          !(entity.label && entity.label.text === 'Kristupas') && 
-          !(entity.billboard && entity.billboard.image && 
-            entity.billboard.image.getValue && 
-            entity.billboard.image.getValue().includes && 
-            entity.billboard.image.getValue().includes('Kristupas')) &&
-          !(entity.id && entity.id.includes && entity.id.includes('kristupas-height-box'))) {
+          // Keep KTU marker
+          ((entity.label && entity.label.text === 'KTU') ||
+           // Keep essential non-marker entities
+           (!(entity.billboard) && 
+            !(entity.box) && 
+            !(entity.id && entity.id.includes && 
+              (entity.id.includes('marker') || 
+               entity.id.includes('kristupas') || 
+               entity.id.includes('height-box')))))) {
         
         // Create minimal backup of essential properties
         const backup = {
@@ -457,18 +458,314 @@ const removeAllKristupasMarkers = (viewer) => {
     viewer.entities.removeAll();
     console.log('Removed ALL entities');
     
-    // Re-add non-Kristupas entities
+    // Re-add essential non-marker entities
     backupEntities.forEach(data => {
       viewer.entities.add(data);
     });
     
-    console.log(`Re-added ${backupEntities.length} non-Kristupas entities`);
+    console.log(`Re-added ${backupEntities.length} essential non-marker entities`);
+  }
+  
+  // Clear the markers array
+  allMarkers.value = [];
+};
+
+// Update the addImageMarker function to support multiple markers
+const addImageMarker = (Cesium, viewer) => {
+  try {
+    if (!viewer || !viewer.entities) {
+      console.error('Viewer not initialized');
+      return;
+    }
+    
+    // Make absolutely sure no Kristupas entities exist before adding new one
+    removeAllKristupasMarkers(viewer);
+    
+    // Load all markers from the allMarkers collection only
+    loadAllMarkers(Cesium, viewer);
+    
+    // The legacy kristupasMarkerPosition entry should only be used for backward compatibility
+    // and to set latestMarkerPosition, not for adding an additional marker
+    const savedPosition = localStorage.getItem('kristupasMarkerPosition');
+    if (savedPosition) {
+      try {
+        const position = JSON.parse(savedPosition);
+        if (position && typeof position.longitude === 'number' && typeof position.latitude === 'number') {
+          // Just update the latestMarkerPosition reference (for Rocket button)
+          // but don't add a marker - they're already added by loadAllMarkers
+          latestMarkerPosition.value = { 
+            longitude: position.longitude, 
+            latitude: position.latitude, 
+            height: (typeof position.height === 'number' && !isNaN(position.height)) ? position.height : 0
+          };
+          
+          console.log('Updated latestMarkerPosition reference from kristupasMarkerPosition');
+        }
+      } catch (err) {
+        console.error('Error parsing saved marker position:', err);
+      }
+    } else {
+      console.log('No saved kristupasMarkerPosition found');
+    }
+  } catch (imageMarkerErr) {
+    console.error('Error in addImageMarker:', imageMarkerErr);
+  }
+};
+
+// Add a new function to load and display all markers
+const loadAllMarkers = (Cesium, viewer) => {
+  try {
+    if (!viewer || !viewer.entities) return;
+    
+    // Get all markers from localStorage
+    const savedMarkers = localStorage.getItem('allMarkers');
+    if (!savedMarkers) {
+      console.log('No allMarkers found in localStorage');
+      return;
+    }
+    
+    try {
+      const markers = JSON.parse(savedMarkers);
+      if (!Array.isArray(markers) || markers.length === 0) {
+        console.log('No markers found in allMarkers array');
+        return;
+      }
+      
+      allMarkers.value = markers;
+      console.log(`Loading ${markers.length} markers from allMarkers`);
+      
+      // Update the latestMarkerPosition with the most recent marker
+      // Sort by timestamp to find the latest one
+      const sortedMarkers = [...markers].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      if (sortedMarkers.length > 0) {
+        const latest = sortedMarkers[0];
+        latestMarkerPosition.value = {
+          longitude: latest.longitude,
+          latitude: latest.latitude, 
+          height: latest.height || 0
+        };
+        console.log('Updated latestMarkerPosition from the most recent marker in allMarkers');
+      }
+      
+      // Add each marker to the map
+      markers.forEach((marker, index) => {
+        const { id, longitude, latitude, height = 0, timestamp = 0 } = marker;
+        
+        if (typeof longitude === 'number' && typeof latitude === 'number' && 
+            !isNaN(longitude) && !isNaN(latitude)) {
+          
+          // Create position
+          const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
+          
+          // Create a unique ID based on the marker ID or timestamp
+          const entityId = 'marker-' + (id || Date.now() + index);
+          
+          // Determine if this is the latest marker
+          const isLatest = sortedMarkers.length > 0 && 
+                          timestamp === sortedMarkers[0].timestamp;
+          
+          // Add entity
+          viewer.entities.add({
+            id: entityId,
+            name: 'Custom Marker',
+            position: position,
+            billboard: {
+              image: isLatest ? '/canfusion_logo.png' : '/marker.png',
+              width: 32,
+              height: 44,
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              scale: 1.0,
+              pixelFormat: Cesium.PixelFormat.RGBA,
+              minimumPixelSize: 32,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY
+            }
+          });
+          
+          // Add height box if height > 0
+          if (height > 0) {
+            viewer.entities.add({
+              id: 'height-box-' + entityId,
+              name: 'Height Box',
+              position: Cesium.Cartesian3.fromDegrees(longitude, latitude, height / 2),
+              box: {
+                dimensions: new Cesium.Cartesian3(5, 5, height),
+                material: Cesium.Color.fromAlpha(Cesium.Color.GREEN, 0.5),
+                outline: true,
+                outlineColor: Cesium.Color.WHITE
+              }
+            });
+          }
+          
+          console.log(`Loaded marker ${entityId} at:`, longitude, latitude, height);
+        }
+      });
+    } catch (err) {
+      console.error('Error parsing saved markers:', err);
+    }
+  } catch (err) {
+    console.error('Error loading all markers:', err);
+  }
+};
+
+// Add a function to handle adding a single new marker
+const addSingleMarker = (Cesium, viewer, markerData) => {
+  try {
+    if (!viewer || !viewer.entities) return;
+    
+    const { id, longitude, latitude, height = 0 } = markerData;
+    
+    if (typeof longitude === 'number' && typeof latitude === 'number' && 
+        !isNaN(longitude) && !isNaN(latitude)) {
+      
+      // Create position
+      const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
+      
+      // Create a unique ID
+      const entityId = 'marker-' + (id || Date.now());
+      
+      // Update all existing markers to use marker.png since they are no longer the latest
+      viewer.entities.values.forEach(entity => {
+        if (entity.billboard && entity.billboard.image && 
+            entity.billboard.image._value === '/canfusion_logo.png') {
+          entity.billboard.image = '/marker.png';
+        }
+      });
+      
+      // Add entity - always use canfusion_logo for the newest marker
+      viewer.entities.add({
+        id: entityId,
+        name: 'New Marker',
+        position: position,
+        billboard: {
+          image: '/canfusion_logo.png',
+          width: 32,
+          height: 44,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          scale: 1.0,
+          pixelFormat: Cesium.PixelFormat.RGBA,
+          minimumPixelSize: 32,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        }
+      });
+      
+      // Add height box if height > 0
+      if (height > 0) {
+        viewer.entities.add({
+          id: 'height-box-' + entityId,
+          name: 'Height Box',
+          position: Cesium.Cartesian3.fromDegrees(longitude, latitude, height / 2),
+          box: {
+            dimensions: new Cesium.Cartesian3(5, 5, height),
+            material: Cesium.Color.fromAlpha(Cesium.Color.GREEN, 0.5),
+            outline: true,
+            outlineColor: Cesium.Color.WHITE
+          }
+        });
+      }
+      
+      console.log(`Added new marker ${entityId} at:`, longitude, latitude, height);
+      
+      // Store this as the latest marker position
+      latestMarkerPosition.value = { longitude, latitude, height };
+    }
+  } catch (err) {
+    console.error('Error adding single marker:', err);
+  }
+};
+
+// Add a function to update a specific marker
+const updateMarker = (Cesium, viewer, markerData) => {
+  try {
+    if (!viewer || !viewer.entities) return;
+    
+    const { id, longitude, latitude, height = 0 } = markerData;
+    
+    if (!id || typeof longitude !== 'number' || typeof latitude !== 'number' || 
+        isNaN(longitude) || isNaN(latitude)) {
+      console.error('Invalid marker data provided:', markerData);
+      return;
+    }
+    
+    // Find and remove the existing entity with this ID
+    const entityId = 'marker-' + id;
+    const heightBoxId = 'height-box-' + entityId;
+    
+    // Remove the existing marker and height box if they exist
+    const existingEntity = viewer.entities.getById(entityId);
+    if (existingEntity) {
+      viewer.entities.remove(existingEntity);
+    }
+    
+    const existingHeightBox = viewer.entities.getById(heightBoxId);
+    if (existingHeightBox) {
+      viewer.entities.remove(existingHeightBox);
+    }
+    
+    // Update all existing markers to use marker.png since they are no longer the latest
+    viewer.entities.values.forEach(entity => {
+      if (entity.billboard && entity.billboard.image && 
+          entity.billboard.image._value === '/canfusion_logo.png') {
+        entity.billboard.image = '/marker.png';
+      }
+    });
+    
+    // Create position
+    const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
+    
+    // Add updated entity - always use canfusion_logo for the newly updated marker
+    viewer.entities.add({
+      id: entityId,
+      name: 'Updated Marker',
+      position: position,
+      billboard: {
+        image: '/canfusion_logo.png',
+        width: 32,
+        height: 44,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        scale: 1.0,
+        pixelFormat: Cesium.PixelFormat.RGBA,
+        minimumPixelSize: 32,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      }
+    });
+    
+    // Add height box if height > 0
+    if (height > 0) {
+      viewer.entities.add({
+        id: heightBoxId,
+        name: 'Height Box',
+        position: Cesium.Cartesian3.fromDegrees(longitude, latitude, height / 2),
+        box: {
+          dimensions: new Cesium.Cartesian3(5, 5, height),
+          material: Cesium.Color.fromAlpha(Cesium.Color.ORANGE, 0.5),
+          outline: true,
+          outlineColor: Cesium.Color.WHITE
+        }
+      });
+    }
+    
+    console.log(`Updated marker ${entityId} at:`, longitude, latitude, height);
+    
+    // Store this as the latest marker position for the Rocket button
+    latestMarkerPosition.value = { longitude, latitude, height };
+    
+  } catch (err) {
+    console.error('Error updating marker:', err);
   }
 };
 
 // Optimized viewer initialization
 onMounted(async () => {
   try {
+    // Check if there are any markers in localStorage - if not, make sure to clear any that might be in memory
+    if (!localStorage.getItem('allMarkers') && !localStorage.getItem('kristupasMarkerPosition')) {
+      console.log('No markers found in localStorage, ensuring all markers are cleared');
+      // Clear all markers from localStorage to ensure clean state
+      localStorage.removeItem('kristupasMarkerPosition');
+      localStorage.removeItem('allMarkers');
+      // Will clear latestMarkerPosition after viewer is initialized
+    }
+    
     // Check if Cesium is available globally
     if (!window.Cesium) {
       error.value = "Cesium not loaded. Try refreshing the page.";
@@ -557,8 +854,13 @@ onMounted(async () => {
               console.log('Camera movement complete, adding markers');
               addKtuMarker(Cesium, viewer);
               
-              // Add the Kristupas marker (the function handles removing any existing markers)
-              addImageMarker(Cesium, viewer);
+              // Check if there are saved markers before trying to add them
+              if (localStorage.getItem('allMarkers') || localStorage.getItem('kristupasMarkerPosition')) {
+                // Add the Kristupas marker (the function handles removing any existing markers)
+                addImageMarker(Cesium, viewer);
+              } else {
+                console.log('No saved markers found during initialization, not adding any markers');
+              }
             }
           });
         }
@@ -566,6 +868,7 @@ onMounted(async () => {
         console.error('Error setting camera position:', cameraErr);
       }
       
+      // After the loadingComplete and before event listeners
       loadingComplete.value = true;
 
       if (buildingTileset) {
@@ -578,12 +881,21 @@ onMounted(async () => {
       // Restore camera position if available
       restoreCameraState();
       
+      // Make sure latestMarkerPosition is cleared if there are no markers
+      if (!localStorage.getItem('allMarkers') && !localStorage.getItem('kristupasMarkerPosition')) {
+        latestMarkerPosition.value = null;
+      }
+      
       // Add event listener for storage changes to update marker position in real-time
       window.addEventListener('storage', (event) => {
         if (event.key === 'kristupasMarkerPosition' && viewer) {
           console.log('Storage event detected, updating marker position');
           // The addImageMarker function now handles removing old markers first
           addImageMarker(Cesium, viewer);
+        } else if (event.key === 'allMarkers' && viewer) {
+          console.log('Storage event detected, updating all markers');
+          removeAllKristupasMarkers(viewer);
+          loadAllMarkers(Cesium, viewer);
         }
       });
       
@@ -593,6 +905,36 @@ onMounted(async () => {
         if (viewer) {
           // The addImageMarker function now handles removing old markers first
           addImageMarker(Cesium, viewer);
+        }
+      });
+      
+      // Add a listener for the markersCleared event
+      window.addEventListener('markersCleared', (event) => {
+        console.log('markersCleared event detected, removing all markers');
+        if (viewer) {
+          removeAllKristupasMarkers(viewer);
+          
+          // Clear the latest marker position if requested
+          if (event.detail && event.detail.removeLatestPosition) {
+            latestMarkerPosition.value = null;
+            console.log('Latest marker position reference cleared');
+          }
+        }
+      });
+      
+      // Add a listener for the markerAdded event
+      window.addEventListener('markerAdded', (event) => {
+        console.log('markerAdded event detected, adding new marker');
+        if (viewer && event.detail) {
+          addSingleMarker(Cesium, viewer, event.detail);
+        }
+      });
+
+      // Add a listener for the markerUpdated event
+      window.addEventListener('markerUpdated', (event) => {
+        console.log('markerUpdated event detected, updating specific marker');
+        if (viewer && event.detail) {
+          updateMarker(Cesium, viewer, event.detail);
         }
       });
     } catch (viewerErr) {
@@ -644,98 +986,6 @@ const addKtuMarker = (Cesium, viewer) => {
     }
   } catch (markerErr) {
     console.error('Error adding KTU marker:', markerErr);
-  }
-};
-
-// Update the addImageMarker function to also store the latest position
-const addImageMarker = (Cesium, viewer) => {
-  try {
-    if (!viewer || !viewer.entities) {
-      console.error('Viewer not initialized');
-      return;
-    }
-    
-    // Make absolutely sure no Kristupas entities exist before adding new one
-    removeAllKristupasMarkers(viewer);
-    
-    // Get coordinates from localStorage if available, otherwise use defaults
-    let longitude = 23.93394;  // Default: near Kaunas
-    let latitude = 54.88637;   // Default
-    let height = 0;            // Default height in meters
-    
-    const savedPosition = localStorage.getItem('kristupasMarkerPosition');
-    if (savedPosition) {
-      try {
-        const position = JSON.parse(savedPosition);
-        if (position && typeof position.longitude === 'number' && typeof position.latitude === 'number') {
-          longitude = position.longitude;
-          latitude = position.latitude;
-          // Use height if available, otherwise default to 0
-          height = (typeof position.height === 'number' && !isNaN(position.height)) 
-            ? position.height 
-            : 0;
-            
-          // Store this as the latest marker position
-          latestMarkerPosition.value = { longitude, latitude, height };
-        }
-      } catch (err) {
-        console.error('Error parsing saved marker position:', err);
-      }
-    }
-    
-    if (typeof longitude === 'number' && typeof latitude === 'number' && 
-        !isNaN(longitude) && !isNaN(latitude)) {
-      
-      // Create the Cartesian3 position with height
-      const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
-      
-      if (position) {
-        // Create a unique ID for this marker
-        const entityId = 'kristupas-' + Date.now();
-        
-        // Add billboard entity with image
-        const entity = viewer.entities.add({
-          id: entityId,
-          name: 'Kristupas Marker',
-          position: position,
-          billboard: {
-            image: '/Kristupas.png',
-            width: 64,
-            height: 64,
-            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            scale: 1.0
-          },
-          label: {
-            text: 'Kristupas',
-            font: '14pt sans-serif',
-            pixelOffset: new Cesium.Cartesian2(0, -70),  // Offset label below image
-            fillColor: Cesium.Color.WHITE,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 2,
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE
-          }
-        });
-        
-        // Add a box to visualize height from ground
-        if (height > 0) {
-          viewer.entities.add({
-            id: 'kristupas-height-box-' + Date.now(),
-            name: 'Kristupas Height Box',
-            position: Cesium.Cartesian3.fromDegrees(longitude, latitude, height / 2),
-            box: {
-              dimensions: new Cesium.Cartesian3(5, 5, height),
-              material: Cesium.Color.fromAlpha(Cesium.Color.BLUE, 0.5),
-              outline: true,
-              outlineColor: Cesium.Color.WHITE
-            }
-          });
-        }
-        
-        console.log('Image marker added at:', longitude, latitude, 'with height:', height, 'ID:', entityId);
-      }
-    }
-  } catch (imageMarkerErr) {
-    console.error('Error adding image marker:', imageMarkerErr);
   }
 };
 </script>

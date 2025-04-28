@@ -99,7 +99,7 @@
                 </div>
                 <div class="bio-text" :class="{ 'visible': bioOpen }">
                   Sveiki! Aš esu Dominykas, CanFusion komandos narys atsakingas už mechanikos, konstravimo ir visų techninių detalių įgyvendinimą CanSat projekte. Mano pagrindinės atsakomybės apima sistemų projektavimą, komponentų paiešką bei gamybą, techninius skaičiavimus, praktinius testavimus, taip pat viso proceso vykdymo sklandumą ir optimizavimą.<br><br>
-                  Be to, rūpinuosi, kad mūsų projekto žinia pasiektų platesnę auditoriją – prisidedu prie viešosios projekto sklaidos ir pristatymo. Man svarbu, kad kiekvienas žingsnis būtų atliktas efektyviai ir inovatyviai, siekiant maksimaliai kokybiško rezultato, todėl bandau komandoje diegti efektyvumą bei komandos tarpusavio darba gerinančius įrankius.
+                  Be to, rūpinuosi, kad mūsų projekto žinia pasiektų platesnę auditoriją – prisidedu prie viešosios projekto sklaidos ir pristatymo. Man svarbu, kad kiekvienas žingsnis būtų atliktas efektyviai ir inovatyviai, siekdamas maksimaliai kokybiško rezultato, todėl bandau komandoje diegti efektyvumą bei komandos tarpusavio darba gerinančius įrankius.
                 </div>
               </div>
               <div class="bio-right">
@@ -594,77 +594,10 @@ html, body {
   white-space: normal;
 }
 
-/* Add mobile responsiveness */
-@media (max-width: 768px) {
-  .bio-content {
-    flex-direction: column-reverse;
-  }
-  
-  .bio-right {
-    flex: 0 0 auto;
-    margin-bottom: 1.5rem;
-  }
-  
-  .bio-image {
-    max-height: 250px; /* Limit image height on mobile */
-    width: 100%;
-    object-fit: cover;
-  }
-  
-  .bio1, .bio2, .bio3, .bio4, .bio5 {
-    margin: 1rem auto;
-  }
-
-  .bio-text {
-    font-size: 1rem;
-    line-height: 1.5;
-    padding: 0 0.5rem;
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.5s ease, margin 0.3s ease;
-    margin-top: 0;
-    text-align: left; /* Left align on mobile for better readability */
-    hyphens: auto; /* Enable hyphenation for better text wrapping */
-    overflow-wrap: break-word;
-    word-break: normal;
-  }
-
-  .bio-text.visible {
-    max-height: 2000px; /* Increase to ensure all text is shown */
-    margin-top: 1rem;
-    padding-bottom: 1rem; /* Add some padding at the bottom */
-  }
-
-  .bio-toggle {
-    display: flex; /* Only show on mobile */
-  }
-
-  .name-container {
-    align-items: center;
-    padding-right: 0.5rem; /* Ensure there's space on the right side */
-  }
-  
-  .name {
-    font-size: 1.8rem; /* Slightly smaller on mobile */
-    cursor: pointer; /* Show pointer cursor to indicate clickability */
-  }
-
-  .bio-container {
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    display: flex;
-  }
-  
-  .bio1, .bio2, .bio3, .bio4, .bio5 {
-    margin: 0 auto;
-  }
-}
-
 /* =============================================
    1. LARGE SCREENS (DESKTOPS)
    ============================================= */
-@media (min-width: 1024px) {
+@media (min-width: 1223px) {
   /* Desktop-specific hero styles */
   .hero-title {
     font-size: 5rem;
@@ -694,42 +627,10 @@ html, body {
   }
 }
 
-/* Tablet and larger (includes both tablets and desktops) */
-@media (min-width: 768px) {
-  .desktop-nav {
-    display: flex;
-  }
-  
-  .menu-toggle {
-    display: none;
-  }
-  
-  .hero-title {
-    font-size: clamp(3rem, 6vw, 4rem);
-  }
-  
-  .hero-logo {
-    height: clamp(4.5rem, 9vw, 6rem);
-  }
-  
-  .hero-subtitle {
-    font-size: clamp(1.8rem, 4vw, 2.5rem);
-  }
-  
-  .container {
-    padding: 3rem;
-  }
-  
-  .hero-title span {
-    font-weight: 700;
-    -webkit-text-stroke: 0;
-  }
-}
-
 /* =============================================
    2. PHONES (MOBILE)
    ============================================= */
-@media (max-width: 767px) {
+@media (max-width: 1222px) {
   /* Mobile header */
   .header-inner {
     padding: 0 1rem;
@@ -811,9 +712,63 @@ html, body {
   .bio1, .bio2, .bio3, .bio4, .bio5 {
     margin-left: 0; /* Remove left margin on mobile */
   }
+  
+  /* Mobile bio styles - show toggle and hide text by default */
+  .bio-content {
+    flex-direction: column-reverse;
+  }
+  
+  .bio-right {
+    flex: 0 0 auto;
+    margin-bottom: 1.5rem;
+  }
+  
+  .bio-image {
+    max-height: 250px; /* Limit image height on mobile */
+    width: 100%;
+    object-fit: cover;
+  }
+  
+  .bio1, .bio2, .bio3, .bio4, .bio5 {
+    margin: 1rem auto;
+  }
+
+  .bio-text {
+    font-size: 1rem;
+    line-height: 1.5;
+    padding: 0 0.5rem;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease, margin 0.3s ease;
+    margin-top: 0;
+    text-align: left; /* Left align on mobile for better readability */
+    hyphens: auto; /* Enable hyphenation for better text wrapping */
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  .bio-text.visible {
+    max-height: 2000px; /* Increase to ensure all text is shown */
+    margin-top: 1rem;
+    padding-bottom: 1rem; /* Add some padding at the bottom */
+  }
+
+  .bio-toggle {
+    display: flex; /* Only show on mobile */
+  }
+
+  .name-container {
+    align-items: center;
+    padding-right: 0.5rem; /* Ensure there's space on the right side */
+  }
+  
+  .name {
+    font-size: 1.8rem; /* Slightly smaller on mobile */
+    cursor: pointer; /* Show pointer cursor to indicate clickability */
+  }
 }
 
-/* Extra small screens */
+/* Keep extra small screen styles */
 @media (max-width: 360px) {
   .hero-title {
     font-size: clamp(2.5rem, 9vw, 3.5rem);
