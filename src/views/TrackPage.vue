@@ -9,7 +9,8 @@
     <div class="location-selector">
       <button @click="flyToLocation('kaunas')" class="location-btn">Kaunas</button>
       <button @click="flyToLocation('moletai')" class="location-btn">Molėtai</button>
-      <button @click="flyToKristupas()" class="location-btn kristupas-btn">Real life kristupas location 100% real</button>
+      <button @click="flyToLithuania()" class="location-btn">Lietuva</button>
+      <button @click="flyToRocket()" class="location-btn">Rocket</button>
     </div>
     
     <!-- Controls panel -->
@@ -57,6 +58,9 @@ const cameraState = ref(null);
 const restorePosition = ref(false);
 const refreshInterval = 5 * 60 * 1000; // 5 minutes in milliseconds
 let refreshTimer = null;
+
+// Add state to track the latest marker position
+const latestMarkerPosition = ref(null);
 
 // Toggle country walls visibility - optimized
 const toggleBorders = () => {
@@ -123,7 +127,7 @@ const flyToLocation = (location) => {
 };
 
 // Function to fly to Kristupas marker
-const flyToKristupas = () => {
+const flyToLithuania = () => {
   if (!viewer) return;
   
   const Cesium = window.Cesium;
@@ -133,6 +137,7 @@ const flyToKristupas = () => {
     // Get Kristupas coordinates from localStorage
     let longitude = 23.93394;  // Default: near Kaunas
     let latitude = 54.88637;   // Default
+    let height = 0;            // Default height
     
     const savedPosition = localStorage.getItem('kristupasMarkerPosition');
     if (savedPosition) {
@@ -141,6 +146,8 @@ const flyToKristupas = () => {
         if (position && typeof position.longitude === 'number' && typeof position.latitude === 'number') {
           longitude = position.longitude;
           latitude = position.latitude;
+          // Use height if available
+          height = (typeof position.height === 'number') ? position.height : 0;
         }
       } catch (err) {
         console.error('Error parsing saved marker position:', err);
@@ -171,6 +178,91 @@ const flyToKristupas = () => {
     });
   } catch (flyErr) {
     console.error('Error flying to panoramic view:', flyErr);
+  }
+};
+
+// Function to fly to the latest marker position
+const flyToRocket = () => {
+  if (!viewer) return;
+  
+  const Cesium = window.Cesium;
+  if (!Cesium) return;
+  
+  try {
+    // Check if we have a stored latest marker position
+    if (latestMarkerPosition.value) {
+      const { longitude, latitude, height = 0 } = latestMarkerPosition.value;
+      
+      // Calculate a position that's offset from the marker
+      // Move camera south by 0.02 degrees and higher
+      const cameraLongitude = longitude;
+      const cameraLatitude = latitude - 0.01;
+      const cameraHeight = height + 1200;
+      
+      // Create destination with offset
+      const destination = Cesium.Cartesian3.fromDegrees(cameraLongitude, cameraLatitude, cameraHeight);
+      
+      // Fly to the position with adjusted orientation to look at the marker
+      viewer.camera.flyTo({
+        destination: destination,
+        orientation: {
+          heading: Cesium.Math.toRadians(0),  // Look north
+          pitch: Cesium.Math.toRadians(-30),  // Look down at an angle
+          roll: 0
+        },
+        duration: 3,
+        complete: function() {
+          // After flight completes, point the camera directly at the marker
+          const markerPosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
+          viewer.camera.lookAt(
+            markerPosition,
+            new Cesium.HeadingPitchRange(
+              Cesium.Math.toRadians(0),
+              Cesium.Math.toRadians(-30),
+              1500  // Reduced distance from 2000 to 1500 meters
+            )
+          );
+        }
+      });
+      
+      console.log('Flying to rocket position with offset:', cameraLongitude, cameraLatitude, cameraHeight);
+    } else {
+      console.log('No rocket position available');
+      // If no latest marker, fly to default KTU position as fallback
+      const ktuLongitude = 23.93599878655166;
+      const ktuLatitude = 54.92015109753495;
+      
+      // Add offset to KTU fallback as well
+      const cameraLongitude = ktuLongitude;
+      const cameraLatitude = ktuLatitude - 0.01;
+      const cameraHeight = 1200;
+      
+      const destination = Cesium.Cartesian3.fromDegrees(cameraLongitude, cameraLatitude, cameraHeight);
+      
+      viewer.camera.flyTo({
+        destination: destination,
+        orientation: {
+          heading: Cesium.Math.toRadians(0),
+          pitch: Cesium.Math.toRadians(-30),
+          roll: 0
+        },
+        duration: 3,
+        complete: function() {
+          // Point at KTU after arrival
+          const ktuPosition = Cesium.Cartesian3.fromDegrees(ktuLongitude, ktuLatitude, 0);
+          viewer.camera.lookAt(
+            ktuPosition,
+            new Cesium.HeadingPitchRange(
+              Cesium.Math.toRadians(0),
+              Cesium.Math.toRadians(-30),
+              1500  // Reduced distance from 2000 to 1500 meters
+            )
+          );
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error flying to rocket position:', error);
   }
 };
 
@@ -293,7 +385,8 @@ const removeAllKristupasMarkers = (viewer) => {
         ((entity.label && entity.label.text === 'Kristupas') || 
          (entity.billboard && entity.billboard.image && entity.billboard.image.getValue && 
           entity.billboard.image.getValue().includes && 
-          entity.billboard.image.getValue().includes('Kristupas')))) {
+          entity.billboard.image.getValue().includes('Kristupas')) ||
+         (entity.id && entity.id.includes && entity.id.includes('kristupas-height-box')))) {
       
       entitiesToRemove.push(entity);
     } else {
@@ -316,7 +409,9 @@ const removeAllKristupasMarkers = (viewer) => {
   // Nuclear option - if there are still Kristupas entities, remove all and re-add non-Kristupas
   let remaining = 0;
   viewer.entities.values.forEach(entity => {
-    if (entity && entity.label && entity.label.text === 'Kristupas') {
+    if (entity && 
+        ((entity.label && entity.label.text === 'Kristupas') ||
+         (entity.id && entity.id.includes && entity.id.includes('kristupas-height-box')))) {
       remaining++;
     }
   });
@@ -332,7 +427,8 @@ const removeAllKristupasMarkers = (viewer) => {
           !(entity.billboard && entity.billboard.image && 
             entity.billboard.image.getValue && 
             entity.billboard.image.getValue().includes && 
-            entity.billboard.image.getValue().includes('Kristupas'))) {
+            entity.billboard.image.getValue().includes('Kristupas')) &&
+          !(entity.id && entity.id.includes && entity.id.includes('kristupas-height-box'))) {
         
         // Create minimal backup of essential properties
         const backup = {
@@ -551,7 +647,7 @@ const addKtuMarker = (Cesium, viewer) => {
   }
 };
 
-// Add custom image marker at specific coordinates
+// Update the addImageMarker function to also store the latest position
 const addImageMarker = (Cesium, viewer) => {
   try {
     if (!viewer || !viewer.entities) {
@@ -565,6 +661,7 @@ const addImageMarker = (Cesium, viewer) => {
     // Get coordinates from localStorage if available, otherwise use defaults
     let longitude = 23.93394;  // Default: near Kaunas
     let latitude = 54.88637;   // Default
+    let height = 0;            // Default height in meters
     
     const savedPosition = localStorage.getItem('kristupasMarkerPosition');
     if (savedPosition) {
@@ -573,6 +670,13 @@ const addImageMarker = (Cesium, viewer) => {
         if (position && typeof position.longitude === 'number' && typeof position.latitude === 'number') {
           longitude = position.longitude;
           latitude = position.latitude;
+          // Use height if available, otherwise default to 0
+          height = (typeof position.height === 'number' && !isNaN(position.height)) 
+            ? position.height 
+            : 0;
+            
+          // Store this as the latest marker position
+          latestMarkerPosition.value = { longitude, latitude, height };
         }
       } catch (err) {
         console.error('Error parsing saved marker position:', err);
@@ -582,8 +686,8 @@ const addImageMarker = (Cesium, viewer) => {
     if (typeof longitude === 'number' && typeof latitude === 'number' && 
         !isNaN(longitude) && !isNaN(latitude)) {
       
-      // Create the Cartesian3 position
-      const position = Cesium.Cartesian3.fromDegrees(longitude, latitude);
+      // Create the Cartesian3 position with height
+      const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
       
       if (position) {
         // Create a unique ID for this marker
@@ -612,7 +716,22 @@ const addImageMarker = (Cesium, viewer) => {
           }
         });
         
-        console.log('Image marker added at:', longitude, latitude, 'with ID:', entityId);
+        // Add a box to visualize height from ground
+        if (height > 0) {
+          viewer.entities.add({
+            id: 'kristupas-height-box-' + Date.now(),
+            name: 'Kristupas Height Box',
+            position: Cesium.Cartesian3.fromDegrees(longitude, latitude, height / 2),
+            box: {
+              dimensions: new Cesium.Cartesian3(5, 5, height),
+              material: Cesium.Color.fromAlpha(Cesium.Color.BLUE, 0.5),
+              outline: true,
+              outlineColor: Cesium.Color.WHITE
+            }
+          });
+        }
+        
+        console.log('Image marker added at:', longitude, latitude, 'with height:', height, 'ID:', entityId);
       }
     }
   } catch (imageMarkerErr) {
@@ -747,26 +866,6 @@ const addImageMarker = (Cesium, viewer) => {
 
 .location-btn:hover {
   background-color: #2563eb;
-}
-
-/* Special styling for the Kristupas button */
-.kristupas-btn {
-  background-color: #4f46e5;
-  color: #ffff00;
-  font-weight: bold;
-  animation: pulse 2s infinite;
-  white-space: nowrap;
-}
-
-.kristupas-btn:hover {
-  background-color: #7c3aed;
-  transform: scale(1.05);
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
 }
 
 /* Controls panel styling */

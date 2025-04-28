@@ -52,7 +52,7 @@
           <h1 class="panel-title">Control Panel</h1>
           
           <div class="control-section">
-            <h2 class="section-title">Kristupas Marker Location</h2>
+            <h2 class="section-title">Marker panel</h2>
             
             <div class="coordinates-control">
               <div class="coordinate-input">
@@ -76,8 +76,22 @@
                   placeholder="Enter latitude"
                 />
               </div>
+              
+              <div class="coordinate-input">
+                <label for="height">Height (meters):</label>
+                <input 
+                  type="number" 
+                  id="height" 
+                  v-model="height" 
+                  step="10"
+                  min="0"
+                  max="10000"
+                  placeholder="Enter height in meters"
+                />
+              </div>
 
               <button @click="updateMarkerPosition" class="update-btn">Update Position</button>
+              <button @click="clearAllMarkers" class="clear-btn">Clear All Markers</button>
             </div>
             
             <div class="current-position">
@@ -96,6 +110,7 @@ import { ref, onMounted } from 'vue';
 const menuOpen = ref(false);
 const longitude = ref(23.93394);  // Default longitude
 const latitude = ref(54.88637);   // Default latitude
+const height = ref(0);
 const displayedLongitude = ref(longitude.value);
 const displayedLatitude = ref(latitude.value);
 
@@ -112,6 +127,7 @@ const updateMarkerPosition = () => {
   localStorage.setItem('kristupasMarkerPosition', JSON.stringify({
     longitude: longitude.value,
     latitude: latitude.value,
+    height: height.value,
     timestamp: Date.now() // Add timestamp to force update
   }));
   
@@ -123,11 +139,31 @@ const updateMarkerPosition = () => {
   window.dispatchEvent(new CustomEvent('kristupasMarkerUpdated', {
     detail: {
       longitude: longitude.value,
-      latitude: latitude.value
+      latitude: latitude.value,
+      height: height.value
     }
   }));
   
-  console.log(`Marker position updated to: ${longitude.value}, ${latitude.value}`);
+  console.log(`Marker position updated to: ${longitude.value}, ${latitude.value}, ${height.value}`);
+};
+
+const clearAllMarkers = () => {
+  // Clear the localStorage
+  localStorage.removeItem('kristupasMarkerPosition');
+  
+  // Reset form values to defaults
+  longitude.value = 23.93394;
+  latitude.value = 54.88637;
+  height.value = 0;
+  
+  // Update displayed values
+  displayedLongitude.value = longitude.value;
+  displayedLatitude.value = latitude.value;
+  
+  // Dispatch a custom event to notify TrackPage to clear markers
+  window.dispatchEvent(new CustomEvent('markersCleared'));
+  
+  console.log('All markers cleared');
 };
 
 onMounted(() => {
@@ -138,6 +174,7 @@ onMounted(() => {
       const position = JSON.parse(savedPosition);
       longitude.value = position.longitude;
       latitude.value = position.latitude;
+      height.value = position.height;
       displayedLongitude.value = longitude.value;
       displayedLatitude.value = latitude.value;
     } catch (error) {
@@ -378,10 +415,9 @@ onMounted(() => {
   font-family: 'Orbitron', sans-serif;
 }
 
-.update-btn {
+.update-btn, .clear-btn {
   margin-top: 1rem;
   padding: 0.75rem 1.5rem;
-  background-color: #2563eb;
   color: white;
   border: none;
   border-radius: 4px;
@@ -391,8 +427,21 @@ onMounted(() => {
   transition: background-color 0.2s;
 }
 
+.update-btn {
+  background-color: #2563eb;
+}
+
 .update-btn:hover {
   background-color: #1d4ed8;
+}
+
+.clear-btn {
+  background-color: #dc2626;
+  margin-top: 0.5rem;
+}
+
+.clear-btn:hover {
+  background-color: #b91c1c;
 }
 
 .current-position {
