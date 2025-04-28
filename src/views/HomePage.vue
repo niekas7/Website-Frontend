@@ -111,7 +111,7 @@
           <div class="bio2">
             <div class="bio-content">
               <div class="bio-right">
-                <img src="/Kipras.png" alt="Kipras" class="bio-image" />
+                <img src="/Kipras.jpg" alt="Kipras" class="bio-image" />
               </div>
               <div class="bio-left">
                 <div class="name-container">
