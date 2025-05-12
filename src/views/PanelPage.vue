@@ -101,6 +101,23 @@
               <p>Current position: {{ displayedLongitude }}, {{ displayedLatitude }}</p>
             </div>
           </div>
+          
+          <!-- New Database Control Section -->
+          <div class="control-section">
+            <h2 class="section-title">Database Management</h2>
+            
+            <div class="db-controls">
+              <p class="db-warning">Warning: These actions cannot be undone!</p>
+              
+              <div class="button-group">
+                <button @click="confirmClearDatabase" class="danger-btn">Erase Database Contents</button>
+              </div>
+              
+              <div v-if="dbStatus" class="db-status" :class="{ 'status-success': dbStatusSuccess, 'status-error': !dbStatusSuccess }">
+                {{ dbStatus }}
+              </div>
+            </div>
+          </div>
         </section>
       </div>
     </div>
@@ -109,6 +126,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import axios from 'axios';
 
 const menuOpen = ref(false);
 const longitude = ref(24);  // Default longitude
@@ -116,6 +134,8 @@ const latitude = ref(55);   // Default latitude
 const height = ref(0);
 const displayedLongitude = ref(longitude.value);
 const displayedLatitude = ref(latitude.value);
+const dbStatus = ref('');
+const dbStatusSuccess = ref(false);
 
 const toggleMenu = () => {
   menuOpen.value = !menuOpen.value;
@@ -270,6 +290,90 @@ const clearAllMarkers = () => {
   console.log('All markers cleared completely');
 };
 
+// Database management functions
+const confirmClearDatabase = () => {
+  const confirmed = confirm('WARNING: This will erase ALL data in the database. This action cannot be undone. Continue?');
+  
+  if (confirmed) {
+    clearDatabase();
+  }
+};
+
+const clearDatabase = async () => {
+  try {
+    dbStatus.value = 'Processing...';
+    dbStatusSuccess.value = false;
+    
+    // First, try the local API endpoint
+    const apiEndpoints = [
+      'http://localhost:5173/api/data/clear',
+      'http://localhost:3000/data/clear',
+      'http://127.0.0.1:3000/data/clear'
+    ];
+    
+    let success = false;
+    let errorMessage = '';
+    
+    // Try each endpoint
+    for (const endpoint of apiEndpoints) {
+      try {
+        console.log(`Attempting to clear database using endpoint: ${endpoint}`);
+        const response = await axios.post(endpoint, {}, { 
+          timeout: 5000,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.status === 200) {
+          console.log('Database cleared successfully:', response.data);
+          dbStatus.value = 'Database cleared successfully!';
+          dbStatusSuccess.value = true;
+          success = true;
+          
+          // Refresh the visualization pages
+          refreshVisualizationPages();
+          break;
+        }
+      } catch (err) {
+        console.error(`Failed to clear database using ${endpoint}:`, err.message);
+        errorMessage = err.message;
+      }
+    }
+    
+    if (!success) {
+      dbStatus.value = `Failed to clear database: ${errorMessage}`;
+      dbStatusSuccess.value = false;
+    }
+  } catch (err) {
+    console.error('Error in clearDatabase function:', err);
+    dbStatus.value = `Error: ${err.message}`;
+    dbStatusSuccess.value = false;
+  }
+};
+
+// Function to refresh the visualization pages
+const refreshVisualizationPages = () => {
+  const baseUrl = window.location.origin;
+  
+  // Try to find existing tabs or open new ones
+  // First broadcast a message to all tabs
+  try {
+    // Send a message to all open tabs
+    window.localStorage.setItem('refreshVisualizationPages', Date.now().toString());
+    console.log('Sent refresh signal to visualization pages');
+    
+    // Show success message for better UX
+    setTimeout(() => {
+      if (dbStatusSuccess.value) {
+        dbStatus.value = 'Database cleared successfully! Visualization pages have been refreshed.';
+      }
+    }, 1000);
+  } catch (error) {
+    console.error('Error sending refresh signal:', error);
+  }
+};
+
 onMounted(() => {
   // Check if there are saved coordinates in localStorage
   const savedPosition = localStorage.getItem('kristupasMarkerPosition');
@@ -291,6 +395,14 @@ onMounted(() => {
     displayedLatitude.value = latitude.value;
     console.log('No saved marker position, using default values for the form only.');
   }
+  
+  // Set up storage event listener for visualization page refresh signals
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'refreshVisualizationPages' && window.location.pathname.includes('grafikai')) {
+      console.log('Received refresh signal, reloading page...');
+      window.location.reload();
+    }
+  });
 });
 </script>
 
@@ -579,5 +691,55 @@ onMounted(() => {
   color: white;
   font-size: 0.9rem;
   text-align: center;
+}
+
+.db-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.db-warning {
+  color: #f87171;
+  font-size: 1rem;
+  text-align: center;
+  font-weight: bold;
+}
+
+.danger-btn {
+  margin-top: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  background-color: #dc2626;
+  width: 100%;
+}
+
+.danger-btn:hover {
+  background-color: #b91c1c;
+}
+
+.db-status {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  text-align: center;
+  width: 100%;
+}
+
+.status-success {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.status-error {
+  background-color: rgba(220, 38, 38, 0.2);
+  color: #f87171;
 }
 </style>
