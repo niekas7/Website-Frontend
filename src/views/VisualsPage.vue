@@ -41,9 +41,20 @@
           <span class="status-dot"></span>
           <span class="status-label">Beeper</span>
         </div>
+        <div class="status-item" :class="{ active: databaseConnected }">
+          <span class="status-dot"></span>
+          <span class="status-label">Database</span>
+        </div>
         
         <div class="rssi-indicator">
           RSSI: <span :class="rssiClass">{{ lastRssi }} dBm</span>
+        </div>
+        
+        <!-- Connection Button -->
+        <div class="control-buttons">
+          <button @click="connectToServer" class="connect-button" :disabled="isConnected">
+            {{ isConnected ? 'Connected' : 'Connect to Server' }}
+          </button>
         </div>
       </div>
       
@@ -109,8 +120,18 @@ import axios from 'axios';
 
 Chart.register(LineElement, PointElement, LinearScale, CategoryScale, Title, Tooltip, Legend);
 
+// Server configuration
+const availableServers = [
+  'http://localhost:5173/api',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
+const serverUrl = ref(import.meta.env.VITE_API_URL || availableServers[0]);
+console.log('Starting with API server URL:', serverUrl.value);
+
 // State variables
 const isConnected = ref(false);
+const databaseConnected = ref(false);
 const lastRssi = ref(0);
 const lastTimestamp = ref(null);
 const lastLat = ref(0);
@@ -178,49 +199,323 @@ const hasValidCoordinates = computed(() => {
 function formatTime(timestamp) {
   if (!timestamp) return '';
   
-  const date = new Date(timestamp);
+  let date;
+  if (typeof timestamp === 'number') {
+    date = new Date(timestamp);
+  } else if (timestamp instanceof Date) {
+    date = timestamp;
+  } else {
+    // Try to parse string date if needed
+    date = new Date(timestamp);
+  }
+  
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid date:', timestamp);
+    return '';
+  }
+  
+  // Fix for database with future year timestamps
+  if (date.getFullYear() > 2024) {
+    // Replace 2025 with current year
+    const currentYear = new Date().getFullYear();
+    date.setFullYear(currentYear);
+  }
+  
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
 }
 
-// Parse data from the server
-function parseData(dataStr, rssi) {
+// Normalize timestamp
+function normalizeTimestamp(timestamp) {
+  if (!timestamp) return Date.now();
+  
+  let date;
+  if (typeof timestamp === 'number') {
+    date = new Date(timestamp);
+  } else if (timestamp instanceof Date) {
+    date = timestamp;
+  } else {
+    // Try to parse string date if needed
+    date = new Date(timestamp);
+  }
+  
+  if (isNaN(date.getTime())) {
+    return Date.now();
+  }
+  
+  // Fix for database with future year timestamps
+  if (date.getFullYear() > 2024) {
+    // Replace 2025 with current year
+    const currentYear = new Date().getFullYear();
+    date.setFullYear(currentYear);
+  }
+  
+  return date.getTime();
+}
+
+// Connect to the specific working server
+async function connectToServer() {
   try {
+    console.log('Connecting to server:', availableServers[0]);
+    
+    // Use the first server in the list (localhost:5173/api)
+    serverUrl.value = availableServers[0];
+    
+    // Clear any existing polling timers
+    if (window.currentPollingTimer) {
+      clearInterval(window.currentPollingTimer);
+      delete window.currentPollingTimer;
+    }
+    
+    // Try to connect
+    const serverConnected = await testServerConnection();
+    
+    if (serverConnected) {
+      // Fetch historical data
+      await fetchHistoricalData();
+      
+      // Start polling
+      startDataPolling();
+      
+      console.log('Successfully connected to', serverUrl.value);
+    } else {
+      console.error('Failed to connect to', serverUrl.value);
+      alert(`Could not connect to ${serverUrl.value}. Please check that your backend server is running.`);
+    }
+  } catch (err) {
+    console.error('Connection error:', err);
+    alert(`Connection error: ${err.message}`);
+  }
+}
+
+// Test connection to server
+async function testServerConnection() {
+  try {
+    console.log(`Testing connection to server: ${serverUrl.value}`);
+    const response = await axios.get(`${serverUrl.value}/data/latest`, {
+      timeout: 3000,
+      withCredentials: false,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      }
+    });
+    console.log('Server connection test succeeded:', response.status);
+    return true;
+  } catch (err) {
+    console.error('Server connection test failed:', err.message);
+    return false;
+  }
+}
+
+// Fetch historical data
+async function fetchHistoricalData() {
+  try {
+    console.log(`Fetching historical data from: ${serverUrl.value}/data/history?limit=${MAX_DATA_POINTS}`);
+    
+    const response = await axios.get(`${serverUrl.value}/data/history?limit=${MAX_DATA_POINTS}`, {
+      timeout: 5000,
+      withCredentials: false,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      }
+    }).catch(error => {
+      console.error('Historical data error:', error.message);
+      throw error;
+    });
+    
+    console.log('Received historical data:', response.data);
+    
+    databaseConnected.value = true;
+    
+    if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+      // Clear any existing data first
+      chartData.value.timestamps = [];
+      chartData.value.temperature = [];
+      chartData.value.humidity = [];
+      chartData.value.pressure = [];
+      chartData.value.altitude = [];
+      chartData.value.acceleration.x = [];
+      chartData.value.acceleration.y = [];
+      chartData.value.acceleration.z = [];
+      chartData.value.photo = [];
+      chartData.value.rssi = [];
+      
+      // Process historical data in reverse order (oldest first)
+      response.data.reverse().forEach(item => {
+        parseData(item.data, item.rssi, item.timestamp);
+      });
+      
+      console.log(`Loaded ${response.data.length} historical data points from database`);
+      return true;
+    } else {
+      console.warn('No historical data received from server');
+      return false;
+    }
+  } catch (err) {
+    console.error('Failed to fetch historical data:', err.message);
+    if (err.response) {
+      console.error('Response error data:', err.response.data);
+      console.error('Response error status:', err.response.status);
+    }
+    
+    databaseConnected.value = false;
+    
+    // Try to reconnect after a delay
+    setTimeout(() => {
+      fetchHistoricalData();
+    }, 5000);
+    
+    return false;
+  }
+}
+
+// Start data polling (improved to poll at regular intervals and handle errors better)
+function startDataPolling() {
+  const pollingInterval = 2000; // 2 seconds
+  let consecutiveErrors = 0;
+  let lastProcessedDataId = null;
+  
+  const poll = async () => {
+    try {
+      console.log(`Polling data from: ${serverUrl.value}/data/latest`);
+      
+      const response = await axios.get(`${serverUrl.value}/data/latest`, {
+        // Add a timeout to prevent hanging requests
+        timeout: 5000,
+        // Handle CORS issues
+        withCredentials: false,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Received data response:', response.data);
+      
+      if (response.data) {
+        isConnected.value = true;
+        databaseConnected.value = true;
+        consecutiveErrors = 0; // Reset error counter on success
+        
+        // Check for unique data point - some servers include an ID
+        const dataId = response.data.id || response.data.timestamp;
+        
+        // Only process if we haven't processed this exact data point before
+        if (dataId !== lastProcessedDataId) {
+          console.log('New data detected, processing...');
+          lastProcessedDataId = dataId;
+          
+          parseData(response.data.data, response.data.rssi, response.data.timestamp);
+        } else {
+          console.log('Skipping duplicate data point with ID:', dataId);
+        }
+      } else {
+        console.warn('Received empty response from server');
+      }
+    } catch (err) {
+      console.error('Failed to poll latest data:', err.message);
+      if (err.response) {
+        console.error('Response error data:', err.response.data);
+        console.error('Response error status:', err.response.status);
+      } else if (err.request) {
+        console.error('No response received from server');
+      }
+      
+      consecutiveErrors++;
+      
+      // After 3 consecutive errors, show disconnected state
+      if (consecutiveErrors >= 3) {
+        isConnected.value = false;
+        databaseConnected.value = false;
+      }
+      
+      // Increase polling interval if we keep getting errors (up to 10 seconds)
+      if (consecutiveErrors > 5) {
+        clearInterval(pollingTimer);
+        setTimeout(() => {
+          startDataPolling(); // Restart polling with default interval
+        }, 10000);
+        return;
+      }
+    }
+  };
+  
+  // Run immediately and then set up interval
+  poll();
+  const pollingTimer = setInterval(poll, pollingInterval);
+  
+  // Store the timer in window object so we can clear it when switching modes
+  window.currentPollingTimer = pollingTimer;
+  
+  // Clear interval on component unmount
+  onUnmounted(() => {
+    clearInterval(pollingTimer);
+    delete window.currentPollingTimer;
+  });
+}
+
+// Parse data from the server
+function parseData(dataStr, rssi, timestamp = null) {
+  try {
+    console.log('Parsing data:', dataStr, 'RSSI:', rssi, 'Timestamp:', timestamp);
+    
+    // If data is empty or not a string, return false
+    if (!dataStr || typeof dataStr !== 'string') {
+      console.error('Invalid data string:', dataStr);
+      return false;
+    }
+    
     const result = {};
     
     // Parse comma-separated values
     const pairs = dataStr.split(',');
     pairs.forEach(pair => {
+      if (!pair || !pair.includes(':')) return;
+      
       const [key, value] = pair.split(':');
-      if (key && value) {
+      if (key && value !== undefined) {
         result[key.trim()] = value.trim();
       }
     });
+    
+    console.log('Parsed data object:', result);
+    
+    // If result is empty, return false
+    if (Object.keys(result).length === 0) {
+      console.error('No valid data pairs found in:', dataStr);
+      return false;
+    }
     
     // Set status flags
     dataStatus.value.launched = dataStr.includes('LAUNCHED');
     dataStatus.value.beeper = dataStr.includes('Beeper on');
     
     // Store RSSI
-    lastRssi.value = rssi;
+    lastRssi.value = rssi || 0;
     
-    // Update timestamp
-    lastTimestamp.value = Date.now();
+    // Update timestamp - normalize to handle various formats
+    lastTimestamp.value = normalizeTimestamp(timestamp);
+    
+    console.log('Using timestamp:', lastTimestamp.value, 'formatted as', formatTime(lastTimestamp.value));
     
     // Update chart data
-    updateChartData(result, rssi);
+    updateChartData(result, lastRssi.value, lastTimestamp.value);
     
     // Update GPS coordinates if valid
-    const lat = parseFloat(result.Lat);
-    const lng = parseFloat(result.Lng);
-    
-    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-      lastLat.value = lat;
-      lastLng.value = lng;
+    if (result.Lat && result.Lng) {
+      const lat = parseFloat(result.Lat);
+      const lng = parseFloat(result.Lng);
       
-      // If we have a map, update the marker
-      if (map && marker) {
-        marker.setLatLng([lat, lng]);
-        map.panTo([lat, lng]);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && result.Lat !== 'nan' && result.Lng !== 'nan') {
+        lastLat.value = lat;
+        lastLng.value = lng;
+        
+        // If we have a map, update the marker
+        if (map && marker) {
+          marker.setLatLng([lat, lng]);
+          map.panTo([lat, lng]);
+        }
       }
     }
     
@@ -232,11 +527,14 @@ function parseData(dataStr, rssi) {
 }
 
 // Update chart data arrays
-function updateChartData(data, rssi) {
-  const timestamp = new Date().toLocaleTimeString();
+function updateChartData(data, rssi, timestamp) {
+  console.log('Updating chart data with timestamp:', timestamp);
+  
+  const formattedTime = formatTime(timestamp);
+  console.log('Formatted time for chart:', formattedTime);
   
   // Add new data
-  chartData.value.timestamps.push(timestamp);
+  chartData.value.timestamps.push(formattedTime);
   chartData.value.temperature.push(parseFloat(data.Temp) || 0);
   chartData.value.humidity.push(parseFloat(data.Humidity) || 0);
   chartData.value.pressure.push(parseFloat(data.Pressure) || 0);
@@ -246,6 +544,8 @@ function updateChartData(data, rssi) {
   chartData.value.acceleration.z.push(parseFloat(data.Gz) || 0);
   chartData.value.photo.push(parseFloat(data.Photo) || 0);
   chartData.value.rssi.push(rssi);
+  
+  console.log('Chart data point added. Total points:', chartData.value.timestamps.length);
   
   // Limit data points
   if (chartData.value.timestamps.length > MAX_DATA_POINTS) {
@@ -259,6 +559,7 @@ function updateChartData(data, rssi) {
     chartData.value.acceleration.z.shift();
     chartData.value.photo.shift();
     chartData.value.rssi.shift();
+    console.log('Removed oldest data point to stay within limit');
   }
   
   // Update all charts
@@ -267,6 +568,8 @@ function updateChartData(data, rssi) {
 
 // Update chart displays
 function updateCharts() {
+  console.log('Updating chart displays');
+  
   if (tempChartInstance) {
     tempChartInstance.data.labels = chartData.value.timestamps;
     tempChartInstance.data.datasets[0].data = chartData.value.temperature;
@@ -310,10 +613,45 @@ function updateCharts() {
     rssiChartInstance.data.datasets[0].data = chartData.value.rssi;
     rssiChartInstance.update();
   }
+  
+  console.log('All charts updated');
 }
 
 // Initialize all charts
 function initializeCharts() {
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: 500
+    },
+    plugins: {
+      legend: {
+        labels: {
+          color: 'white'
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: 'rgba(255, 255, 255, 0.7)'
+        },
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)'
+        }
+      },
+      y: {
+        ticks: {
+          color: 'rgba(255, 255, 255, 0.7)'
+        },
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)'
+        }
+      }
+    }
+  };
+
   // Temperature chart
   tempChartInstance = new Chart(tempChart.value, {
     type: 'line',
@@ -328,10 +666,11 @@ function initializeCharts() {
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      ...commonOptions,
       scales: {
+        ...commonOptions.scales,
         y: {
+          ...commonOptions.scales.y,
           beginAtZero: false
         }
       }
@@ -352,10 +691,11 @@ function initializeCharts() {
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      ...commonOptions,
       scales: {
+        ...commonOptions.scales,
         y: {
+          ...commonOptions.scales.y,
           beginAtZero: true,
           suggestedMax: 100
         }
@@ -377,10 +717,11 @@ function initializeCharts() {
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      ...commonOptions,
       scales: {
+        ...commonOptions.scales,
         y: {
+          ...commonOptions.scales.y,
           beginAtZero: false
         }
       }
@@ -401,10 +742,11 @@ function initializeCharts() {
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      ...commonOptions,
       scales: {
+        ...commonOptions.scales,
         y: {
+          ...commonOptions.scales.y,
           beginAtZero: true
         }
       }
@@ -441,10 +783,11 @@ function initializeCharts() {
       ]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      ...commonOptions,
       scales: {
+        ...commonOptions.scales,
         y: {
+          ...commonOptions.scales.y,
           beginAtZero: false
         }
       }
@@ -465,10 +808,11 @@ function initializeCharts() {
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      ...commonOptions,
       scales: {
+        ...commonOptions.scales,
         y: {
+          ...commonOptions.scales.y,
           beginAtZero: true
         }
       }
@@ -489,10 +833,11 @@ function initializeCharts() {
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      ...commonOptions,
       scales: {
+        ...commonOptions.scales,
         y: {
+          ...commonOptions.scales.y,
           beginAtZero: false,
           reverse: true  // Higher values at bottom (worse signal)
         }
@@ -532,58 +877,119 @@ function initializeMap() {
   }
 }
 
-// Fetch historical data
-async function fetchHistoricalData() {
-  try {
-    const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    const response = await axios.get(`${serverUrl}/data/history?limit=${MAX_DATA_POINTS}`);
-    
-    if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-      // Process historical data in reverse order (oldest first)
-      response.data.reverse().forEach(item => {
-        parseData(item.data, item.rssi);
-      });
+// Generate sample data for testing
+function generateSampleData() {
+  console.log('Generating sample data for testing');
+  
+  // Create a sample data string that matches the format from backend
+  const sampleData = [
+    { 
+      data: "Time:1000,Temp:25.5,Humidity:65.2,Pressure:1013.5,Altitude:120.5,Lat:54.6872,Lng:25.2797,Gx:0.1,Gy:0.2,Gz:9.8,Photo:720",
+      rssi: -65,
+      timestamp: Date.now() - 50000
+    },
+    { 
+      data: "Time:1001,Temp:25.7,Humidity:64.8,Pressure:1013.2,Altitude:121.0,Lat:54.6873,Lng:25.2798,Gx:0.15,Gy:0.18,Gz:9.78,Photo:730",
+      rssi: -67,
+      timestamp: Date.now() - 40000
+    },
+    { 
+      data: "Time:1002,Temp:25.9,Humidity:64.5,Pressure:1013.0,Altitude:121.5,Lat:54.6874,Lng:25.2799,Gx:0.12,Gy:0.22,Gz:9.82,Photo:740",
+      rssi: -68,
+      timestamp: Date.now() - 30000
+    },
+    { 
+      data: "Time:1003,Temp:26.1,Humidity:64.0,Pressure:1012.8,Altitude:122.0,Lat:54.6875,Lng:25.2800,Gx:0.08,Gy:0.25,Gz:9.81,Photo:750,LAUNCHED",
+      rssi: -63,
+      timestamp: Date.now() - 20000
+    },
+    { 
+      data: "Time:1004,Temp:26.3,Humidity:63.5,Pressure:1012.5,Altitude:122.5,Lat:54.6876,Lng:25.2801,Gx:0.05,Gy:0.28,Gz:9.79,Photo:760,LAUNCHED,Beeper on",
+      rssi: -62,
+      timestamp: Date.now() - 10000
     }
-  } catch (err) {
-    console.error('Failed to fetch historical data:', err);
-  }
-}
-
-// Start data polling (modified to be the primary data source)
-function startDataPolling() {
-  const pollingInterval = 2000; // 2 seconds
+  ];
   
-  const poll = async () => {
-    try {
-      const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await axios.get(`${serverUrl}/data/latest`);
-      
-      if (response.data) {
-        isConnected.value = true;
-        parseData(response.data.data, response.data.rssi);
-      }
-    } catch (err) {
-      console.error('Failed to poll latest data:', err);
-      isConnected.value = false;
-    }
-  };
+  // Clear any existing data
+  chartData.value.timestamps = [];
+  chartData.value.temperature = [];
+  chartData.value.humidity = [];
+  chartData.value.pressure = [];
+  chartData.value.altitude = [];
+  chartData.value.acceleration.x = [];
+  chartData.value.acceleration.y = [];
+  chartData.value.acceleration.z = [];
+  chartData.value.photo = [];
+  chartData.value.rssi = [];
   
-  const pollingTimer = setInterval(poll, pollingInterval);
-  
-  // Clear interval on component unmount
-  onUnmounted(() => {
-    clearInterval(pollingTimer);
+  // Add sample data points
+  sampleData.forEach(item => {
+    parseData(item.data, item.rssi, item.timestamp);
   });
+  
+  console.log('Sample data loaded:', sampleData.length, 'points');
+  
+  // Simulate new data coming in every 5 seconds
+  let counter = 5;
+  const sampleTimer = setInterval(() => {
+    const now = Date.now();
+    const newData = {
+      data: `Time:${1000 + counter},Temp:${26.3 + Math.random()},Humidity:${63 - Math.random()},Pressure:${1012 - Math.random()},Altitude:${123 + counter},Lat:${54.6876 + counter/10000},Lng:${25.2801 + counter/10000},Gx:${Math.random()/10},Gy:${Math.random()/10},Gz:9.8,Photo:${760 + counter*10},LAUNCHED,Beeper on`,
+      rssi: -60 - Math.floor(Math.random() * 10),
+      timestamp: now
+    };
+    
+    parseData(newData.data, newData.rssi, newData.timestamp);
+    console.log('Generated new sample data point at:', formatTime(now));
+    
+    counter++;
+    
+    // Stop after 30 sample points
+    if (counter > 30) {
+      clearInterval(sampleTimer);
+      console.log('Stopped generating sample data');
+    }
+  }, 5000);
+  
+  // Store the timer in a window variable so we can clear it if needed
+  window.sampleDataTimer = sampleTimer;
 }
 
 // Lifecycle hooks
-onMounted(() => {
-  initializeCharts();
-  initializeMap();
-  fetchHistoricalData();
+onMounted(async () => {
+  console.log('VisualsPage component mounted');
   
-  // Start polling immediately - no waiting for socket failure
-  startDataPolling();
+  // Initialize charts first
+  initializeCharts();
+  console.log('Charts initialized');
+  
+  // Initialize map
+  initializeMap();
+  console.log('Map initialized');
+  
+  // Test server connection
+  const serverConnected = await testServerConnection();
+  if (!serverConnected) {
+    console.warn('Could not connect to server on startup. Will keep retrying...');
+    
+    // Alert the user about connection issues
+    alert(`Could not connect to server at ${serverUrl.value}. You can:\n1. Check if your server is running\n2. Click "Connect to Server" to try alternative URLs\n3. Click "Use Demo Data" to see simulated data`);
+    
+    // If we can't connect, use sample data for testing
+    setTimeout(() => {
+      generateSampleData();
+    }, 2000);
+  } else {
+    // Fetch historical data
+    const historyLoaded = await fetchHistoricalData();
+    console.log('Historical data fetched:', historyLoaded ? 'success' : 'failed');
+    
+    // Start polling after a short delay to ensure backend is ready
+    setTimeout(() => {
+      startDataPolling();
+      console.log('Data polling started');
+    }, 1000);
+  }
 });
 
 onUnmounted(() => {
@@ -598,6 +1004,17 @@ onUnmounted(() => {
   
   // Clean up map
   if (map) map.remove();
+  
+  // Clear any timers
+  if (window.currentPollingTimer) {
+    clearInterval(window.currentPollingTimer);
+    delete window.currentPollingTimer;
+  }
+  
+  if (window.sampleDataTimer) {
+    clearInterval(window.sampleDataTimer);
+    delete window.sampleDataTimer;
+  }
 });
 </script>
 
@@ -830,5 +1247,35 @@ canvas {
     grid-column: span 1;
     height: 400px;
   }
+}
+
+.control-buttons {
+  margin-left: auto;
+}
+
+.connect-button {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: 'Orbitron', sans-serif;
+  transition: background-color 0.2s;
+}
+
+.connect-button:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.connect-button:disabled {
+  background-color: #10b981;
+  cursor: default;
+}
+
+/* Remove debug button styles since they're no longer used */
+.debug-controls {
+  display: none;
 }
 </style>

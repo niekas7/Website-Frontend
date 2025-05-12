@@ -103,7 +103,7 @@
                 </div>
               </div>
               <div class="bio-right">
-                <img src="/Dominykas.png" alt="Dominykas" class="bio-image" />
+                <img src="/placeholder.png" alt="Dominykas" class="bio-image" />
               </div>
             </div>
           </div>
@@ -111,7 +111,7 @@
           <div class="bio2">
             <div class="bio-content">
               <div class="bio-right">
-                <img src="/Kipras.jpg" alt="Kipras" class="bio-image" />
+                <img src="/placeholder.jpg" alt="Kipras" class="bio-image" />
               </div>
               <div class="bio-left">
                 <div class="name-container">
@@ -143,7 +143,7 @@
                 </div>
               </div>
               <div class="bio-right">
-                <img src="/Emilis.png" alt="Emilis" class="bio-image" />
+                <img src="/placeholder.png" alt="Emilis" class="bio-image" />
               </div>
             </div>
           </div>
@@ -151,7 +151,7 @@
           <div class="bio4">
             <div class="bio-content">
               <div class="bio-right">
-                <img src="/Kristupas.png" alt="Kristupas" class="bio-image" />
+                <img src="/placeholder.png" alt="Kristupas" class="bio-image" />
               </div>
               <div class="bio-left">
                 <div class="name-container">
@@ -183,7 +183,7 @@
                 </div>
               </div>
               <div class="bio-right">
-                <img src="/Domantas.png" alt="Domantas" class="bio-image" />
+                <img src="/placeholder.png" alt="Domantas" class="bio-image" />
               </div>
             </div>
           </div>
