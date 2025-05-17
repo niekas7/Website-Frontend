@@ -103,6 +103,11 @@
           <h2>Light Sensor</h2>
           <div class="chart-container" ref="photoChartRef"></div>
         </div>
+        
+        <div class="chart-wrapper">
+          <h2>RSSI (Signal Strength)</h2>
+          <div class="chart-container" ref="rssiChartRef"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -143,6 +148,7 @@ let pressureChart = null;
 let altitudeChart = null;
 let accelerationChart = null;
 let photoChart = null;
+let rssiChart = null;
 let map = null;
 let marker = null;
 let pollingInterval = null;
@@ -154,6 +160,7 @@ const pressureChartRef = ref(null);
 const altitudeChartRef = ref(null);
 const accelChartRef = ref(null);
 const photoChartRef = ref(null);
+const rssiChartRef = ref(null);
 const mapContainer = ref(null);
 
 // Data arrays for charts
@@ -266,7 +273,7 @@ async function initializeCharts() {
   
   // Check if DOM elements are ready
   if (!tempChartRef.value || !humidityChartRef.value || !pressureChartRef.value || 
-      !altitudeChartRef.value || !accelChartRef.value || !photoChartRef.value) {
+      !altitudeChartRef.value || !accelChartRef.value || !photoChartRef.value || !rssiChartRef.value) {
     console.error('Chart DOM elements not ready. Aborting chart initialization.');
     return false;
   }
@@ -358,9 +365,9 @@ async function initializeCharts() {
     
     const accelRows = chartData.value.timestamps.map((time, index) => [
       time, 
-      chartData.value.acceleration.x[index],
-      chartData.value.acceleration.y[index],
-      chartData.value.acceleration.z[index]
+      -1 * chartData.value.acceleration.x[index],
+      -1 * chartData.value.acceleration.y[index],
+      -1 * chartData.value.acceleration.z[index]
     ]);
     accelData.addRows(accelRows);
     
@@ -379,6 +386,19 @@ async function initializeCharts() {
     
     photoChart = new google.visualization.LineChart(photoChartRef.value);
     photoChart.draw(photoData, { ...commonOptions, title: '' });
+    
+    // RSSI Chart
+    const rssiData = new google.visualization.DataTable();
+    rssiData.addColumn('string', 'Time');
+    rssiData.addColumn('number', 'RSSI (dBm)');
+    
+    const rssiRows = chartData.value.timestamps.map((time, index) => [
+      time, chartData.value.rssi[index]
+    ]);
+    rssiData.addRows(rssiRows);
+    
+    rssiChart = new google.visualization.LineChart(rssiChartRef.value);
+    rssiChart.draw(rssiData, { ...commonOptions, title: '' });
     
     console.log('All charts initialized successfully');
     chartsInitialized.value = true;
@@ -493,9 +513,9 @@ function updateCharts() {
     
     const accelRows = chartData.value.timestamps.map((time, index) => [
       time, 
-      chartData.value.acceleration.x[index],
-      chartData.value.acceleration.y[index],
-      chartData.value.acceleration.z[index]
+      -1 * chartData.value.acceleration.x[index],
+      -1 * chartData.value.acceleration.y[index],
+      -1 * chartData.value.acceleration.z[index]
     ]);
     accelData.addRows(accelRows);
     
@@ -512,6 +532,18 @@ function updateCharts() {
     photoData.addRows(photoRows);
     
     photoChart.draw(photoData, { ...commonOptions, title: '' });
+    
+    // Update RSSI Chart
+    const rssiData = new google.visualization.DataTable();
+    rssiData.addColumn('string', 'Time');
+    rssiData.addColumn('number', 'RSSI (dBm)');
+    
+    const rssiRows = chartData.value.timestamps.map((time, index) => [
+      time, chartData.value.rssi[index]
+    ]);
+    rssiData.addRows(rssiRows);
+    
+    rssiChart.draw(rssiData, { ...commonOptions, title: '' });
     
     console.log('UpdateCharts - All charts updated successfully.');
   } catch (error) {

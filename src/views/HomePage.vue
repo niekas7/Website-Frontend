@@ -23,10 +23,11 @@
 
           <nav class="desktop-nav">
             <a href="#mission" class="nav-link" @click="(e) => handleNavClick(e, '#mission')">Misija</a>
-            <a href="#progress" class="nav-link" @click="(e) => handleNavClick(e, '#progress')">Projekto progresas</a>
             <a href="#bio-section" class="nav-link" @click="(e) => handleNavClick(e, '#bio-section')">Apie mus</a>
             <a href="/galerija" class="nav-link">Galerija</a>
+            <router-link to="/grafikai" class="nav-link">Grafikai</router-link>
             <router-link to="/track" class="nav-link">Žemėlapis</router-link>
+            <router-link to="/3d" class="nav-link">3D Modelis</router-link>
           </nav>
 
           <button class="menu-toggle" @click="toggleMenu">
@@ -51,6 +52,7 @@
           <a href="#bio-section" class="nav-link" @click="closeMenu">Apie mus</a>
           <a href="/galerija" class="nav-link" @click="closeMenu">Galerija</a>
           <router-link to="/track" class="nav-link" @click="closeMenu">Žemėlapis</router-link>
+          <router-link to="/3d" class="nav-link" @click="closeMenu">3D Modelis</router-link>
         </div>
       </transition>
 
@@ -103,7 +105,7 @@
                 </div>
               </div>
               <div class="bio-right">
-                <img src="/placeholder.png" alt="Dominykas" class="bio-image" />
+                <img src="/Dominykas.png" alt="Dominykas" class="bio-image" />
               </div>
             </div>
           </div>
@@ -111,7 +113,7 @@
           <div class="bio2">
             <div class="bio-content">
               <div class="bio-right">
-                <img src="/placeholder.jpg" alt="Kipras" class="bio-image" />
+                <img src="/Kipras.png" alt="Kipras" class="bio-image" />
               </div>
               <div class="bio-left">
                 <div class="name-container">
@@ -143,7 +145,7 @@
                 </div>
               </div>
               <div class="bio-right">
-                <img src="/placeholder.png" alt="Emilis" class="bio-image" />
+                <img src="/Emilis.png" alt="Emilis" class="bio-image" />
               </div>
             </div>
           </div>
@@ -151,7 +153,7 @@
           <div class="bio4">
             <div class="bio-content">
               <div class="bio-right">
-                <img src="/placeholder.png" alt="Kristupas" class="bio-image" />
+                <img src="/Kristupas.png" alt="Kristupas" class="bio-image" />
               </div>
               <div class="bio-left">
                 <div class="name-container">
@@ -183,7 +185,7 @@
                 </div>
               </div>
               <div class="bio-right">
-                <img src="/placeholder.png" alt="Domantas" class="bio-image" />
+                <img src="/Domantas.png" alt="Domantas" class="bio-image" />
               </div>
             </div>
           </div>

@@ -5,6 +5,7 @@ import PanelPage from '../views/PanelPage.vue'
 import ForbiddenPage from '../views/ForbiddenPage.vue'
 import VisualsPagelocal from '../views/VisualsPagelocal.vue'
 import VisualsPagepublic from '../views/VisualsPagepublic.vue'
+import ThreeDPage from '../views/ThreeDPage.vue'
 
 const routes = [
   {
@@ -31,6 +32,11 @@ const routes = [
     path: '/grafikai2',
     name: 'grafikai2',
     component: VisualsPagelocal
+  },
+  {
+    path: '/3d',
+    name: 'ThreeD',
+    component: ThreeDPage
   },
   {
     path: '/403',

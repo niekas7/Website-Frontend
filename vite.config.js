@@ -4,7 +4,13 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [
-    vue(),
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: tag => tag === 'model-viewer'
+        }
+      }
+    }),
   ],
   server: {
     allowedHosts: ['canfusion.space', 'niekas7.hdun.org'],

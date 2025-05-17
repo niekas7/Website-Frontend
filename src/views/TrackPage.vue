@@ -10,7 +10,7 @@
       <button @click="flyToLocation('kaunas')" class="location-btn">Kaunas</button>
       <button @click="flyToLocation('moletai')" class="location-btn">Molėtai</button>
       <button @click="flyToLithuania()" class="location-btn">Lietuva</button>
-      <button @click="flyToRocket()" class="location-btn">Rocket</button>
+      <button @click="flyToRocket()" class="location-btn">CanSat</button>
     </div>
     
     <!-- Controls panel -->
@@ -41,6 +41,7 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
 import * as Cesium from 'cesium';
+import axios from 'axios'; // Import axios for API calls
 
 // Track loading state and errors
 const loadingComplete = ref(false);
@@ -66,6 +67,139 @@ const allMarkers = ref([]);
 // Add state to track if camera is locked facing a marker
 const cameraLockedOnMarker = ref(false);
 
+// Add polling state
+let dataPollingTimer = null;
+const pollingInterval = 2000; // 2 seconds
+const lastProcessedDataId = ref(null);
+
+// Server URL configuration
+const availableServers = [
+  'http://localhost:5173/api',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
+const serverUrl = ref(import.meta.env.VITE_API_URL || availableServers[0]);
+
+// Define location-specific height offsets for known areas
+const locationOffsets = {
+  kaunas: {
+    google: -100,
+    osm: -80
+  },
+  moletai: {
+    google: -200,
+    osm: -150
+  }
+};
+
+let currentLocation = ref('default');
+const dynamicTerrainOffset = ref(-100); // Default dynamic offset
+
+// Function to get appropriate height offset based on location or dynamic sampling
+const getHeightOffsetForLocation = (isGoogle = true) => {
+  if (locationOffsets[currentLocation.value]) {
+    // Use pre-defined offset for known locations
+    const offsets = locationOffsets[currentLocation.value];
+    return isGoogle ? offsets.google : offsets.osm;
+  } else {
+    // For any location in the world, apply dynamic offset with some rules:
+    // Google tiles need slightly deeper offset than OSM buildings
+    return isGoogle ? dynamicTerrainOffset.value : dynamicTerrainOffset.value * 0.8;
+  }
+};
+
+// Sample terrain at current location to determine appropriate building offsets
+const sampleTerrainForOffset = async () => {
+  if (!viewer || !viewer.scene || !viewer.scene.globe) return;
+
+  try {
+    console.log('Sampling terrain at current location to determine building height offsets');
+    
+    // Get current camera position
+    const cameraPosition = viewer.camera.positionCartographic;
+    const longitude = Cesium.Math.toDegrees(cameraPosition.longitude);
+    const latitude = Cesium.Math.toDegrees(cameraPosition.latitude);
+    
+    // Define a grid of points around the camera to sample
+    const sampleRadius = 0.01; // ~1km radius
+    const samplePoints = [
+      { lng: longitude, lat: latitude }, // Center
+      { lng: longitude + sampleRadius, lat: latitude }, // East
+      { lng: longitude - sampleRadius, lat: latitude }, // West
+      { lng: longitude, lat: latitude + sampleRadius }, // North
+      { lng: longitude, lat: latitude - sampleRadius }  // South
+    ];
+    
+    // Convert to Cartographic for terrain sampling
+    const positions = samplePoints.map(point => 
+      Cesium.Cartographic.fromDegrees(point.lng, point.lat)
+    );
+    
+    // Sample terrain heights
+    const terrainProvider = viewer.scene.globe.terrainProvider;
+    const updatedPositions = await Cesium.sampleTerrainMostDetailed(terrainProvider, positions);
+    
+    if (updatedPositions && updatedPositions.length > 0) {
+      // Calculate average height of sample points
+      let totalHeight = 0;
+      let validSamples = 0;
+      
+      updatedPositions.forEach(pos => {
+        if (typeof pos.height === 'number' && !isNaN(pos.height)) {
+          totalHeight += pos.height;
+          validSamples++;
+        }
+      });
+      
+      if (validSamples > 0) {
+        const averageHeight = totalHeight / validSamples;
+        console.log('Average terrain height around current position:', averageHeight);
+        
+        // Determine base offset for buildings based on height:
+        // Higher elevations generally need larger offsets
+        const baseOffset = Math.min(-100, -80 - averageHeight * 0.1);
+        
+        // Update dynamic offset
+        dynamicTerrainOffset.value = baseOffset;
+        console.log('Set dynamic terrain offset to:', dynamicTerrainOffset.value);
+        
+        // Apply the new offset
+        updateBuildingHeights();
+        return true;
+      }
+    }
+    
+    console.log('Unable to determine terrain height, using default offset');
+    return false;
+  } catch (err) {
+    console.error('Error sampling terrain for offset:', err);
+    return false;
+  }
+};
+
+// Function to update building heights based on location or dynamic sampling
+const updateBuildingHeights = () => {
+  if (!viewer) return;
+  
+  if (buildingTileset) {
+    const googleOffset = getHeightOffsetForLocation(true);
+    const transform = Cesium.Matrix4.fromTranslation(
+      new Cesium.Cartesian3(0, 0, googleOffset)
+    );
+    buildingTileset.modelMatrix = transform;
+  }
+  
+  if (osmBuildingTileset) {
+    const osmOffset = getHeightOffsetForLocation(false);
+    const transform = Cesium.Matrix4.fromTranslation(
+      new Cesium.Cartesian3(0, 0, osmOffset)
+    );
+    osmBuildingTileset.modelMatrix = transform;
+  }
+  
+  console.log(`Applied building height offsets: Google=${getHeightOffsetForLocation(true)}, OSM=${getHeightOffsetForLocation(false)}`);
+};
+
 // Toggle country walls visibility - optimized
 const toggleBorders = () => {
   countryWallsDataSource.show = showWalls.value = !showWalls.value;
@@ -81,6 +215,11 @@ const toggleBuildings = () => {
 const toggleBuildingType = () => {
   if (!viewer) return;
   useGoogleTiles.value = !useGoogleTiles.value;
+  
+  // Apply height adjustments (location-specific or dynamic)
+  updateBuildingHeights();
+  
+  // Update visibility of both tilesets
   updateBuildingTilesets();
 };
 
@@ -94,7 +233,7 @@ const updateBuildingTilesets = () => {
   }
 };
 
-// Function to fly to different locations with good Google 3D Tiles coverage
+// Modify flyToLocation to work for any location in the world
 const flyToLocation = (location) => {
   if (!viewer) return;
   
@@ -111,6 +250,9 @@ const flyToLocation = (location) => {
       pitch: Cesium.Math.toRadians(-25),
       roll: 0
     };
+    
+    // Set known location or 'default' for global dynamic adjustment
+    currentLocation.value = locationOffsets[location] ? location : 'default';
     
     switch(location) {
       case 'kaunas':
@@ -129,7 +271,16 @@ const flyToLocation = (location) => {
     viewer.camera.flyTo({
       destination: destination,
       orientation: orientation,
-      duration: 3
+      duration: 3,
+      complete: function() {
+        // After flight completes, sample terrain height and adjust buildings
+        if (currentLocation.value === 'default') {
+          sampleTerrainForOffset();
+        } else {
+          // For known locations, use pre-defined offset
+          updateBuildingHeights();
+        }
+      }
     });
   } catch (flyErr) {
     console.error('Error flying to location:', flyErr);
@@ -275,7 +426,9 @@ const setBuildingStyle = (tileset) => {
       conditions: [
         ["true", "color('white')"]
       ]
-    }
+    },
+    // Ensure buildings have correct height reference
+    heightReference: "CLAMP_TO_GROUND"
   });
 };
 
@@ -754,7 +907,198 @@ const updateMarker = (Cesium, viewer, markerData) => {
   }
 };
 
-// Optimized viewer initialization
+// Add new function to poll data from the database
+const startDataPolling = () => {
+  console.log('Starting live data polling from:', serverUrl.value);
+  
+  if (dataPollingTimer) {
+    clearInterval(dataPollingTimer);
+  }
+  
+  let consecutiveErrors = 0;
+  
+  const poll = async () => {
+    try {
+      console.log(`Polling data from: ${serverUrl.value}/data/latest`);
+      
+      const response = await axios.get(`${serverUrl.value}/data/latest`, {
+        timeout: 5000,
+        withCredentials: false,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Received data response:', response.data);
+      
+      if (response.data) {
+        consecutiveErrors = 0; // Reset error counter on success
+        
+        // Check for unique data point
+        const dataId = response.data.id || response.data.timestamp;
+        
+        // Only process if we haven't processed this exact data point before
+        if (dataId !== lastProcessedDataId.value) {
+          console.log('New data detected, processing...');
+          lastProcessedDataId.value = dataId;
+          
+          processLiveData(response.data);
+        } else {
+          console.log('Skipping duplicate data point with ID:', dataId);
+        }
+      } else {
+        console.warn('Received empty response from server');
+      }
+    } catch (err) {
+      console.error('Failed to poll latest data:', err.message);
+      if (err.response) {
+        console.error('Response error data:', err.response.data);
+        console.error('Response error status:', err.response.status);
+      } else if (err.request) {
+        console.error('No response received from server');
+      }
+      
+      consecutiveErrors++;
+      
+      // If too many errors, extend polling interval
+      if (consecutiveErrors > 5) {
+        clearInterval(dataPollingTimer);
+        setTimeout(() => {
+          startDataPolling(); // Restart polling with default interval
+        }, 10000);
+        return;
+      }
+    }
+  };
+  
+  // Run immediately and then set up interval
+  poll();
+  dataPollingTimer = setInterval(poll, pollingInterval);
+};
+
+// Add function to process live data
+const processLiveData = (data) => {
+  try {
+    if (!data) return;
+    
+    // Parse the data format from the backend
+    let latitude = null;
+    let longitude = null;
+    let height = 0; // Use height instead of altitude for consistency
+    
+    // Check if the data has the 'data' string property
+    if (data.data && typeof data.data === 'string') {
+      console.log('Parsing data string:', data.data);
+      
+      // Split by comma to get the key-value pairs
+      const pairs = data.data.split(',');
+      
+      // Go through each pair to find lat, lng, and altitude
+      pairs.forEach(pair => {
+        if (!pair || !pair.includes(':')) return;
+        const [key, value] = pair.split(':').map(s => s.trim());
+        
+        switch(key) {
+          case 'Lat': 
+            latitude = value === 'nan' ? null : parseFloat(value); 
+            break;
+          case 'Lng': 
+            longitude = value === 'nan' ? null : parseFloat(value); 
+            break;
+          case 'Altitude': 
+            height = parseFloat(value); 
+            break;
+        }
+      });
+      
+      console.log('Extracted coordinates:', { latitude, longitude, height });
+    } else if (data.lat !== undefined && data.lng !== undefined) {
+      // Direct properties from database
+      latitude = data.lat === 'nan' ? null : parseFloat(data.lat);
+      longitude = data.lng === 'nan' ? null : parseFloat(data.lng);
+      height = data.altitude !== undefined ? parseFloat(data.altitude) : 0;
+    }
+    
+    if (typeof longitude === 'number' && typeof latitude === 'number' && 
+        !isNaN(longitude) && !isNaN(latitude) && 
+        longitude !== null && latitude !== null) {
+        
+      // Update the latest marker position
+      latestMarkerPosition.value = {
+        longitude,
+        latitude,
+        height: height || 0
+      };
+      
+      // Generate a unique marker ID
+      const markerId = 'livedata_' + Date.now();
+      
+      // Update or create marker
+      const newMarker = {
+        id: markerId,
+        longitude,
+        latitude,
+        height: height || 0,
+        timestamp: Date.now()
+      };
+      
+      // Update markers list
+      if (!allMarkers.value) allMarkers.value = [];
+      
+      // Remove previous live data markers to avoid cluttering
+      allMarkers.value = allMarkers.value.filter(marker => !marker.id.includes('livedata_'));
+      
+      // Add new marker
+      allMarkers.value.push(newMarker);
+      
+      // Update localStorage for other components
+      localStorage.setItem('allMarkers', JSON.stringify(allMarkers.value));
+      
+      // Also update kristupasMarkerPosition for backward compatibility
+      localStorage.setItem('kristupasMarkerPosition', JSON.stringify({
+        longitude,
+        latitude,
+        height: height || 0,
+        timestamp: Date.now()
+      }));
+      
+      // Update the marker on the map if viewer exists
+      if (viewer) {
+        // Dispatch custom event to handle marker update
+        window.dispatchEvent(new CustomEvent('markerUpdated', {
+          detail: {
+            id: markerId,
+            longitude,
+            latitude,
+            height: height || 0
+          }
+        }));
+      }
+    }
+  } catch (err) {
+    console.error('Error processing live data:', err);
+  }
+};
+
+// Add listener for camera changes to update building heights globally
+const addCameraChangeListener = () => {
+  if (!viewer) return;
+  
+  // Only sample terrain occasionally to avoid performance issues
+  let lastSampleTime = 0;
+  const SAMPLE_THROTTLE_MS = 5000; // Sample at most every 5 seconds
+  
+  viewer.camera.changed.addEventListener(() => {
+    const now = Date.now();
+    if (now - lastSampleTime > SAMPLE_THROTTLE_MS && currentLocation.value === 'default') {
+      lastSampleTime = now;
+      sampleTerrainForOffset();
+    }
+  });
+};
+
+// Modified onMounted function
 onMounted(async () => {
   try {
     // Check if there are any markers in localStorage - if not, make sure to clear any that might be in memory
@@ -836,11 +1180,28 @@ onMounted(async () => {
         maximumScreenSpaceError: 32,
         show: false // Hidden initially
       });
+      
+      buildingTileset.clippingPlanes = new Cesium.ClippingPlaneCollection({
+        enabled: false
+      });
+      
+      // Apply initial height adjustment - will be updated dynamically
+      const buildingTransform = Cesium.Matrix4.fromTranslation(
+        new Cesium.Cartesian3(0, 0, getHeightOffsetForLocation(true))
+      );
+      buildingTileset.modelMatrix = buildingTransform;
+            
       viewer.scene.primitives.add(buildingTileset);
 
       osmBuildingTileset = await Cesium.createOsmBuildingsAsync();
       osmBuildingTileset.maximumScreenSpaceError = 32;
-      osmBuildingTileset.show = false; // Hidden initially  
+      osmBuildingTileset.show = false; // Hidden initially
+      
+      const osmTransform = Cesium.Matrix4.fromTranslation(
+        new Cesium.Cartesian3(0, 0, getHeightOffsetForLocation(false))
+      );
+      osmBuildingTileset.modelMatrix = osmTransform;
+        
       viewer.scene.primitives.add(osmBuildingTileset);
 
       // Set default view to Lithuania with error handling
@@ -937,6 +1298,18 @@ onMounted(async () => {
           updateMarker(Cesium, viewer, event.detail);
         }
       });
+
+      // Start polling for live data
+      startDataPolling();
+      
+      // Add listener for camera changes to update building heights globally
+      addCameraChangeListener();
+      
+      // Sample terrain at current position for initial offset
+      setTimeout(() => {
+        sampleTerrainForOffset();
+      }, 1000);
+      
     } catch (viewerErr) {
       console.error('Error creating Cesium viewer:', viewerErr);
       error.value = viewerErr.toString();
@@ -953,6 +1326,9 @@ onUnmounted(() => {
   if (refreshTimer) {
     clearInterval(refreshTimer);
   }
+  if (dataPollingTimer) {
+    clearInterval(dataPollingTimer);
+  }
   if (viewer) {
     viewer.entities.removeAll();
     viewer.scene.primitives.removeAll();
@@ -965,21 +1341,36 @@ const addKtuMarker = (Cesium, viewer) => {
   try {
     const ktuLongitude = 23.93599878655166;
     const ktuLatitude = 54.92015109753495;
+    const ktuHeight = 200; // Add height to place marker above buildings
     
     if (typeof ktuLongitude === 'number' && typeof ktuLatitude === 'number' && 
         !isNaN(ktuLongitude) && !isNaN(ktuLatitude)) {
-      const position = Cesium.Cartesian3.fromDegrees(ktuLongitude, ktuLatitude);
+      const position = Cesium.Cartesian3.fromDegrees(ktuLongitude, ktuLatitude, ktuHeight);
       
       if (position && viewer.entities) {
         viewer.entities.add({
           position: position,
           point: {
             pixelSize: 10,
-            color: Cesium.Color.BLUE
+            color: Cesium.Color.BLUE,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY // Always show regardless of buildings
           },
           label: {
             text: 'KTU',
-            font: '14pt sans-serif'
+            font: '14pt sans-serif',
+            disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always show regardless of buildings
+            pixelOffset: new Cesium.Cartesian2(0, -20), // Offset label to appear above point
+            fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE
+          },
+          billboard: {
+            image: '/marker.png', // Use a marker image for better visibility
+            width: 32,
+            height: 44,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY // Always show regardless of buildings
           }
         });
       }
