@@ -29,6 +29,7 @@
         shadow-softness="0"
         @error="handleError"
         @load="handleLoad"
+        ref="modelViewer"
       >
         <div class="progress-container" slot="progress-bar">
           <div class="progress-bar">
@@ -40,6 +41,10 @@
           View in AR
         </button>
       </model-viewer>
+      
+      <button class="orbit-button" @click="toggleOrbit">
+        {{ isOrbiting ? 'Stop Orbit' : 'Orbit Model' }}
+      </button>
       
       <div v-if="errorMessage" class="error-message">
         {{ errorMessage }}
@@ -58,6 +63,9 @@ export default {
   setup() {
     const errorMessage = ref('');
     const currentFormat = ref('gltf');
+    const modelViewer = ref(null);
+    const isOrbiting = ref(false);
+    let orbitAnimation = null;
     
     const handleError = (event) => {
       console.error('Error loading model', event);
@@ -75,13 +83,13 @@ export default {
       }
       
       // Apply high-quality rendering enhancements
-      const modelViewer = document.querySelector('model-viewer');
-      if (modelViewer) {
+      const modelViewerElement = document.querySelector('model-viewer');
+      if (modelViewerElement) {
         // Force high quality rendering
-        modelViewer.interpolationDecay = 0;
+        modelViewerElement.interpolationDecay = 0;
         
         // Access WebGL renderer through Three.js internals if available
-        const renderer = modelViewer.renderer;
+        const renderer = modelViewerElement.renderer;
         if (renderer) {
           try {
             renderer.physicallyCorrectLights = true;
@@ -93,8 +101,8 @@ export default {
         }
         
         // Force high quality rendering in shadow DOM
-        if (modelViewer.shadowRoot) {
-          const canvas = modelViewer.shadowRoot.querySelector('canvas');
+        if (modelViewerElement.shadowRoot) {
+          const canvas = modelViewerElement.shadowRoot.querySelector('canvas');
           if (canvas) {
             // Apply crisp rendering styles
             canvas.style.imageRendering = 'crisp-edges';
@@ -108,7 +116,7 @@ export default {
           
           // Try to set shadow map settings if THREE is available
           try {
-            modelViewer.shadowMap = {
+            modelViewerElement.shadowMap = {
               enabled: true,
               type: window.THREE?.PCFShadowMap || 'PCFShadowMap'
             };
@@ -120,28 +128,70 @@ export default {
     };
     
     const tryAlternativeFormat = () => {
-      const modelViewer = document.querySelector('model-viewer');
-      if (!modelViewer) return;
+      const modelViewerElement = document.querySelector('model-viewer');
+      if (!modelViewerElement) return;
       
       if (currentFormat.value === 'gltf') {
-        modelViewer.src = '/mockupas.glb';
+        modelViewerElement.src = '/mockupas.glb';
         currentFormat.value = 'glb';
         errorMessage.value = 'Trying GLB format...';
       } else {
-        modelViewer.src = '/mockupas.gltf';
+        modelViewerElement.src = '/mockupas.gltf';
         currentFormat.value = 'gltf';
         errorMessage.value = 'Trying GLTF format...';
+      }
+    };
+
+    const toggleOrbit = () => {
+      isOrbiting.value = !isOrbiting.value;
+      
+      if (isOrbiting.value) {
+        startOrbit();
+      } else {
+        stopOrbit();
+      }
+    };
+
+    const startOrbit = () => {
+      if (!modelViewer.value) return;
+      
+      let theta = 0;
+      const radius = 2.5; // Distance from model center
+      const height = 75; // Camera height in degrees
+      
+      // Cancel any existing animation
+      if (orbitAnimation) {
+        cancelAnimationFrame(orbitAnimation);
+      }
+      
+      const animate = () => {
+        if (!isOrbiting.value) return;
+        
+        theta +=2; // Speed of rotation
+        const orbitString = `${theta}deg ${height}deg ${radius}m`;
+        modelViewer.value.setAttribute('camera-orbit', orbitString);
+        
+        orbitAnimation = requestAnimationFrame(animate);
+      };
+      
+      orbitAnimation = requestAnimationFrame(animate);
+    };
+    
+    const stopOrbit = () => {
+      if (orbitAnimation) {
+        cancelAnimationFrame(orbitAnimation);
+        orbitAnimation = null;
       }
     };
     
     onMounted(() => {
       // Allow time for component to render before querying it
       setTimeout(() => {
-        const modelViewer = document.querySelector('model-viewer');
+        modelViewer.value = document.querySelector('model-viewer');
         
-        if (modelViewer) {
+        if (modelViewer.value) {
           // Handle loading progress
-          modelViewer.addEventListener('progress', (event) => {
+          modelViewer.value.addEventListener('progress', (event) => {
             const updateBar = document.querySelector('.update-bar');
             if (updateBar) {
               updateBar.style.width = `${event.detail.totalProgress * 100}%`;
@@ -157,7 +207,10 @@ export default {
       errorMessage,
       handleError,
       handleLoad,
-      tryAlternativeFormat
+      tryAlternativeFormat,
+      modelViewer,
+      toggleOrbit,
+      isOrbiting
     };
   }
 };
@@ -269,6 +322,25 @@ model-viewer canvas {
 }
 
 .ar-button:hover {
+  background-color: #1d4ed8;
+}
+
+.orbit-button {
+  background-color: #2563eb;
+  border-radius: 4px;
+  border: none;
+  color: white;
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  padding: 12px 16px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.orbit-button:hover {
   background-color: #1d4ed8;
 }
 

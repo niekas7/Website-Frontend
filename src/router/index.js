@@ -45,8 +45,27 @@ const routes = [
   },
   {
     // Catch all route - redirect any undefined paths to 403
+    // Except for API routes that should be handled by the backend
     path: '/:pathMatch(.*)*',
-    redirect: '/403'
+    beforeEnter: (to, from, next) => {
+      // API routes to exclude from 403 redirect
+      const apiRoutes = [
+        '/',                // GET / - Returns a "Hello" message
+        '/data',            // POST /data - Receives and stores sensor data
+        '/data/clear',      // POST /data/clear - Clears all data
+        '/data/latest',     // GET /data/latest - Returns the most recent sensor data
+        '/data/history'     // GET /data/history - Returns historical sensor data
+      ];
+      
+      // Check if the path matches any of the API routes
+      if (apiRoutes.includes(to.path) || to.path.startsWith('/data/history?')) {
+        // Let the request pass through to the backend
+        return;
+      }
+      
+      // Redirect to 403 for all other undefined routes
+      next('/403');
+    }
   }
 ]
 

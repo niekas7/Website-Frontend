@@ -24,7 +24,6 @@
           <nav class="desktop-nav">
             <a href="#mission" class="nav-link" @click="(e) => handleNavClick(e, '#mission')">Misija</a>
             <a href="#bio-section" class="nav-link" @click="(e) => handleNavClick(e, '#bio-section')">Apie mus</a>
-            <a href="/galerija" class="nav-link">Galerija</a>
             <router-link to="/grafikai" class="nav-link">Grafikai</router-link>
             <router-link to="/track" class="nav-link">Žemėlapis</router-link>
             <router-link to="/3d" class="nav-link">3D Modelis</router-link>
@@ -48,9 +47,8 @@
       <transition name="menu-transition">
         <div v-if="menuOpen" class="mobile-menu">
           <a href="#mission" class="nav-link" @click="closeMenu">Misija</a>
-          <a href="#progress" class="nav-link" @click="closeMenu">Projekto progresas</a>
           <a href="#bio-section" class="nav-link" @click="closeMenu">Apie mus</a>
-          <a href="/galerija" class="nav-link" @click="closeMenu">Galerija</a>
+          <router-link to="/grafikai" class="nav-link" @click="closeMenu">Grafikai</router-link>
           <router-link to="/track" class="nav-link" @click="closeMenu">Žemėlapis</router-link>
           <router-link to="/3d" class="nav-link" @click="closeMenu">3D Modelis</router-link>
         </div>
@@ -644,7 +642,7 @@ html, body {
   
   /* Mobile navigation */
   .desktop-nav {
-    display: none;
+    display: none !important; /* Force hide on mobile */
   }
   
   .menu-toggle {
@@ -652,15 +650,20 @@ html, body {
     border: none;
     cursor: pointer;
     padding: 0.5rem;
-    display: flex;
+    display: flex !important; /* Force display on mobile */
     align-items: center;
     justify-content: center;
+    z-index: 20; /* Ensure it's above other elements */
+    position: absolute; /* Position it absolutely */
+    right: 1rem; /* Position from right edge */
   }
   
   .menu-toggle svg {
     width: 2rem;
     height: 2rem;
     color: white;
+    fill: none; /* Ensure the SVG has no fill */
+    stroke: white; /* Set the stroke color explicitly */
   }
   
   .mobile-menu {
@@ -790,7 +793,7 @@ html, body {
    3. TABLETS
    ============================================= */
 /* Tablet-specific styles (768px-1023px) */
-@media (min-width: 768px) and (max-width: 1023px) {
+@media (min-width: 768px) and (max-width: 1222px) {
   .header-inner {
     padding: 0 1rem;
   }
@@ -803,10 +806,19 @@ html, body {
     height: 2.8rem;
   }
   
+  /* Hide desktop nav on tablets too */
   .desktop-nav {
-    gap: 1.2rem;
+    display: none !important;
   }
   
+  /* Show menu toggle on tablets */
+  .menu-toggle {
+    display: flex !important;
+    position: absolute;
+    right: 1rem;
+  }
+  
+  /* Adjust nav links for tablets that still show them */
   .nav-link {
     font-size: 1.3rem;
   }

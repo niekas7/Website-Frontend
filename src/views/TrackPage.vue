@@ -25,6 +25,34 @@
       >
         {{ useGoogleTiles ? 'Paprasti pastatai' : 'Fotorealistiški pastatai' }}
       </button>
+      
+      <!-- Add marker size slider -->
+      <div class="slider-control">
+        <label for="marker-size">Marker Size:</label>
+        <input 
+          type="range" 
+          id="marker-size" 
+          v-model="markerScale" 
+          min="0.5" 
+          max="2.0" 
+          step="0.1"
+          @input="updateAllMarkerSizes"
+        />
+      </div>
+      
+      <!-- Add label size slider -->
+      <div class="slider-control">
+        <label for="label-size">Label Size:</label>
+        <input 
+          type="range" 
+          id="label-size" 
+          v-model="labelScale" 
+          min="0.7" 
+          max="2.0" 
+          step="0.1"
+          @input="updateAllLabelSizes"
+        />
+      </div>
     </div>
     
     <!-- Add loading/error message -->
@@ -39,7 +67,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, computed } from 'vue';
 import * as Cesium from 'cesium';
 import axios from 'axios'; // Import axios for API calls
 
@@ -72,13 +100,29 @@ let dataPollingTimer = null;
 const pollingInterval = 2000; // 2 seconds
 const lastProcessedDataId = ref(null);
 
+// Add state for marker history data
+const historyData = ref([]);
+
+// Add state for marker scaling
+const markerScale = ref(1.0); // Default marker scale
+// Add state for label scaling
+const labelScale = ref(1.0); // Default label scale
+
 // Server URL configuration
 const availableServers = [
   'http://localhost:5173/api',
-  'http://localhost:3000',
-  'http://127.0.0.1:3000'
+  'http://canfusion.space/api'
 ];
-const serverUrl = ref(import.meta.env.VITE_API_URL || availableServers[0]);
+
+// Determine server URL based on public access
+let determinedServerUrl;
+const hostname = window.location.hostname;
+if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+  determinedServerUrl = 'http://canfusion.space/api';
+} else {
+  determinedServerUrl = import.meta.env.VITE_API_URL || availableServers[0];
+}
+const serverUrl = ref(determinedServerUrl);
 
 // Define location-specific height offsets for known areas
 const locationOffsets = {
@@ -356,9 +400,23 @@ const flyToRocket = () => {
   if (!Cesium) return;
   
   try {
-    // Check if we have a stored latest marker position
-    if (latestMarkerPosition.value) {
-      const { longitude, latitude, height = 0 } = latestMarkerPosition.value;
+    // Find the latest marker from the allMarkers array
+    let latestMarker = null;
+
+    if (allMarkers.value && allMarkers.value.length > 0) {
+      // Sort by timestamp and get the most recent one
+      latestMarker = [...allMarkers.value].sort((a, b) => b.timestamp - a.timestamp)[0];
+      console.log('Found latest marker by timestamp:', latestMarker);
+    } 
+    
+    // If no marker found in allMarkers, try the stored latestMarkerPosition
+    if (!latestMarker && latestMarkerPosition.value) {
+      latestMarker = latestMarkerPosition.value;
+      console.log('Using latestMarkerPosition as fallback');
+    }
+    
+    if (latestMarker) {
+      const { longitude, latitude, height = 0 } = latestMarker;
       
       // Set camera lock state to true since we're focusing on the marker
       cameraLockedOnMarker.value = true;
@@ -393,11 +451,23 @@ const flyToRocket = () => {
                 1500  // Distance in meters from the target
               )
             );
+            
+            // Update the active marker visually (if possible)
+            if (viewer.entities) {
+              // Find the entity ID for this marker
+              const targetId = 'marker-' + (latestMarker.id || 'latest');
+              const targetEntity = viewer.entities.getById(targetId);
+              
+              if (targetEntity && targetEntity.billboard) {
+                // Highlight the active marker
+                targetEntity.billboard.scale = 1.2;
+              }
+            }
           }
         }
       });
       
-      console.log('Flying to rocket position with offset:', cameraLongitude, cameraLatitude, cameraHeight);
+      console.log('Flying to latest rocket position with offset:', cameraLongitude, cameraLatitude, cameraHeight);
     } else {
       console.log('No marker position available for Rocket button');
       alert('No markers available. Please add a marker first.');
@@ -409,10 +479,17 @@ const flyToRocket = () => {
 
 // Optimized camera setup
 const initializeCamera = (Cesium) => {
-  viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
-  viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100;
-  viewer.scene.screenSpaceCameraController.maximumZoomDistance = 5000000;
+  const controller = viewer.scene.screenSpaceCameraController;
   
+  // Reduce zoom sensitivity (default is 5.0)
+  controller.zoomFactor = 5;
+  
+  // Other camera settings
+  controller.enableCollisionDetection = false;
+  controller.minimumZoomDistance = 100;
+  controller.maximumZoomDistance = 5000000;
+  
+  // Performance settings
   viewer.scene.globe.enableLighting = false;
   viewer.scene.globe.depthTestAgainstTerrain = false;
   viewer.scene.fog.enabled = false;
@@ -461,8 +538,8 @@ const saveCameraState = () => {
     timestamp: Date.now()
   }));
 
-  // Reload the page
-  window.location.reload();
+  // Page reload removed per user request
+  // window.location.reload();
 };
 
 // Add this function to restore camera state
@@ -727,7 +804,7 @@ const loadAllMarkers = (Cesium, viewer) => {
               width: 32,
               height: 44,
               verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-              scale: 1.0,
+              scale: isLatest ? markerScale.value : markerScale.value * 0.7, // Use the reactive scale value
               pixelFormat: Cesium.PixelFormat.RGBA,
               minimumPixelSize: 32,
               disableDepthTestDistance: Number.POSITIVE_INFINITY
@@ -745,6 +822,27 @@ const loadAllMarkers = (Cesium, viewer) => {
                 material: Cesium.Color.fromAlpha(Cesium.Color.GREEN, 0.5),
                 outline: true,
                 outlineColor: Cesium.Color.WHITE
+              }
+            });
+          }
+
+          // Add label for height
+          if (id) { // Ensure marker has an id for the label
+            const labelId = 'label-' + id;
+            viewer.entities.add({
+              id: labelId,
+              name: 'Height Label',
+              position: position,
+              label: {
+                text: `${Math.round(height)}m`,
+                font: `${Math.round(12 * labelScale.value)}pt sans-serif`,
+                fillColor: Cesium.Color.WHITE,
+                outlineColor: Cesium.Color.BLACK,
+                outlineWidth: 2,
+                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                verticalOrigin: Cesium.VerticalOrigin.TOP,
+                pixelOffset: new Cesium.Cartesian2(0, 5),
+                disableDepthTestDistance: Number.POSITIVE_INFINITY
               }
             });
           }
@@ -775,28 +873,59 @@ const addSingleMarker = (Cesium, viewer, markerData) => {
       
       // Create a unique ID
       const entityId = 'marker-' + (id || Date.now());
+      const labelId = 'label-' + (id || Date.now());
+
+      // Determine marker image based on altitude change
+      let markerImage = '/canfusion_logo.png'; // Default for new marker or no previous data
+      if (latestMarkerPosition.value && typeof latestMarkerPosition.value.height === 'number') {
+        if (height > latestMarkerPosition.value.height) {
+          markerImage = '/marker.png'; // Altitude increasing
+        } else if (height < latestMarkerPosition.value.height) {
+          markerImage = '/marker2.png'; // Altitude decreasing
+        }
+      }
       
-      // Update all existing markers to use marker.png since they are no longer the latest
+      // Update all existing markers to use marker.png or marker2.png if they were the latest (canfusion_logo)
       viewer.entities.values.forEach(entity => {
         if (entity.billboard && entity.billboard.image && 
             entity.billboard.image._value === '/canfusion_logo.png') {
-          entity.billboard.image = '/marker.png';
+          // Determine previous marker's image based on its height relative to this new one (or a default)
+          // This logic might need refinement if history markers also need up/down icons
+          entity.billboard.image = '/marker.png'; 
         }
       });
       
-      // Add entity - always use canfusion_logo for the newest marker
+      // Add billboard entity
       viewer.entities.add({
         id: entityId,
         name: 'New Marker',
         position: position,
         billboard: {
-          image: '/canfusion_logo.png',
+          image: markerImage,
           width: 32,
           height: 44,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          scale: 1.0,
+          scale: markerScale.value, // Use the reactive scale value
           pixelFormat: Cesium.PixelFormat.RGBA,
           minimumPixelSize: 32,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        }
+      });
+
+      // Add label for height
+      viewer.entities.add({
+        id: labelId,
+        name: 'Height Label',
+        position: position,
+        label: {
+          text: `${Math.round(height)}m`,
+          font: `${Math.round(12 * labelScale.value)}pt sans-serif`,
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.TOP,
+          pixelOffset: new Cesium.Cartesian2(0, 5),
           disableDepthTestDistance: Number.POSITIVE_INFINITY
         }
       });
@@ -819,7 +948,7 @@ const addSingleMarker = (Cesium, viewer, markerData) => {
       console.log(`Added new marker ${entityId} at:`, longitude, latitude, height);
       
       // Store this as the latest marker position
-      latestMarkerPosition.value = { longitude, latitude, height };
+      latestMarkerPosition.value = { id, longitude, latitude, height };
     }
   } catch (err) {
     console.error('Error adding single marker:', err);
@@ -842,8 +971,9 @@ const updateMarker = (Cesium, viewer, markerData) => {
     // Find and remove the existing entity with this ID
     const entityId = 'marker-' + id;
     const heightBoxId = 'height-box-' + entityId;
+    const labelId = 'label-' + id;
     
-    // Remove the existing marker and height box if they exist
+    // Remove the existing marker, height box, and label if they exist
     const existingEntity = viewer.entities.getById(entityId);
     if (existingEntity) {
       viewer.entities.remove(existingEntity);
@@ -853,31 +983,85 @@ const updateMarker = (Cesium, viewer, markerData) => {
     if (existingHeightBox) {
       viewer.entities.remove(existingHeightBox);
     }
+
+    const existingLabel = viewer.entities.getById(labelId);
+    if (existingLabel) {
+      viewer.entities.remove(existingLabel);
+    }
     
-    // Update all existing markers to use marker.png since they are no longer the latest
-    viewer.entities.values.forEach(entity => {
-      if (entity.billboard && entity.billboard.image && 
-          entity.billboard.image._value === '/canfusion_logo.png') {
-        entity.billboard.image = '/marker.png';
+    // Determine if this is the latest marker (non-history)
+    const isLatestMarker = !id.includes('history_');
+    
+    let markerImage;
+    if (isLatestMarker) {
+      // Determine marker image based on altitude change
+      markerImage = '/canfusion_logo.png'; // Default for new/latest marker
+      if (latestMarkerPosition.value && typeof latestMarkerPosition.value.height === 'number' && latestMarkerPosition.value.id === id) { // Check if it's the same marker being updated
+        if (height > latestMarkerPosition.value.height) {
+          markerImage = '/marker.png'; // Altitude increasing
+        } else if (height < latestMarkerPosition.value.height) {
+          markerImage = '/marker2.png'; // Altitude decreasing
+        }
+      } else if (allMarkers.value.length > 0) {
+        // Fallback for initial load or if latestMarkerPosition is not yet set for this specific marker
+        const previousMarker = allMarkers.value.find(m => m.id === id); // Find its own previous state if available
+        if (previousMarker && typeof previousMarker.height === 'number') {
+             if (height > previousMarker.height) markerImage = '/marker.png';
+             else if (height < previousMarker.height) markerImage = '/marker2.png';
+        }
       }
-    });
+
+
+      // Update other markers to a default non-latest icon
+      viewer.entities.values.forEach(entity => {
+        if (entity.id !== entityId && entity.billboard && entity.billboard.image &&
+            (entity.billboard.image._value === '/canfusion_logo.png' || entity.billboard.image._value === '/marker.png' || entity.billboard.image._value === '/marker2.png')) {
+          // If it's not the current marker being updated, and it was a 'latest' icon, set to default old marker icon.
+          // We assume history markers are handled separately or have a generic icon already.
+           if (!entity.id.includes('history_')) { // Avoid changing history markers here
+            entity.billboard.image = '/marker.png'; // Default old marker icon
+          }
+        }
+      });
+    } else {
+      // Logic for history markers (e.g., always use a standard icon)
+      markerImage = '/marker.png'; // Default for history markers
+    }
     
     // Create position
     const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
     
-    // Add updated entity - always use canfusion_logo for the newly updated marker
+    // Add updated billboard entity
     viewer.entities.add({
       id: entityId,
-      name: 'Updated Marker',
+      name: 'Marker',
       position: position,
       billboard: {
-        image: '/canfusion_logo.png',
+        image: markerImage,
         width: 32,
         height: 44,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        scale: 1.0,
+        scale: isLatestMarker ? markerScale.value : markerScale.value * 0.7, // Make history markers smaller
         pixelFormat: Cesium.PixelFormat.RGBA,
         minimumPixelSize: 32,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      }
+    });
+
+    // Add updated label for height
+    viewer.entities.add({
+      id: labelId,
+      name: 'Height Label',
+      position: position,
+      label: {
+        text: `${Math.round(height)}m`,
+        font: `${Math.round(12 * labelScale.value)}pt sans-serif`,
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.TOP,
+        pixelOffset: new Cesium.Cartesian2(0, 5),
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       }
     });
@@ -890,17 +1074,22 @@ const updateMarker = (Cesium, viewer, markerData) => {
         position: Cesium.Cartesian3.fromDegrees(longitude, latitude, height / 2),
         box: {
           dimensions: new Cesium.Cartesian3(5, 5, height),
-          material: Cesium.Color.fromAlpha(Cesium.Color.ORANGE, 0.5),
+          material: Cesium.Color.fromAlpha(
+            isLatestMarker ? Cesium.Color.ORANGE : Cesium.Color.DEEPSKYBLUE, 
+            isLatestMarker ? 0.5 : 0.3
+          ),
           outline: true,
-          outlineColor: Cesium.Color.WHITE
+          outlineColor: isLatestMarker ? Cesium.Color.WHITE : Cesium.Color.LIGHTGRAY
         }
       });
     }
     
     console.log(`Updated marker ${entityId} at:`, longitude, latitude, height);
     
-    // Store this as the latest marker position for the Rocket button
-    latestMarkerPosition.value = { longitude, latitude, height };
+    // Update the latest marker position only if this is the current marker
+    if (isLatestMarker) {
+      latestMarkerPosition.value = { id, longitude, latitude, height }; // Store id too for better tracking
+    }
     
   } catch (err) {
     console.error('Error updating marker:', err);
@@ -919,9 +1108,9 @@ const startDataPolling = () => {
   
   const poll = async () => {
     try {
-      console.log(`Polling data from: ${serverUrl.value}/data/latest`);
+      console.log(`Polling data from: ${serverUrl.value}/data/history`);
       
-      const response = await axios.get(`${serverUrl.value}/data/latest`, {
+      const response = await axios.get(`${serverUrl.value}/data/history`, {
         timeout: 5000,
         withCredentials: false,
         headers: {
@@ -935,17 +1124,37 @@ const startDataPolling = () => {
       if (response.data) {
         consecutiveErrors = 0; // Reset error counter on success
         
-        // Check for unique data point
-        const dataId = response.data.id || response.data.timestamp;
-        
-        // Only process if we haven't processed this exact data point before
-        if (dataId !== lastProcessedDataId.value) {
-          console.log('New data detected, processing...');
-          lastProcessedDataId.value = dataId;
+        // Handle history data (array of data points)
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          console.log('Processing history data array with', response.data.length, 'points');
           
-          processLiveData(response.data);
+          // Get the most recent data ID to track updates
+          const latestData = response.data[0];
+          const dataId = latestData.id || latestData.timestamp;
+          
+          // Only process if we haven't processed this exact data before
+          if (dataId !== lastProcessedDataId.value) {
+            console.log('New data detected, processing all history points...');
+            lastProcessedDataId.value = dataId;
+            
+            // Process all data points in the array
+            processAllHistoryData(response.data);
+          } else {
+            console.log('Skipping duplicate data with ID:', dataId);
+          }
         } else {
-          console.log('Skipping duplicate data point with ID:', dataId);
+          // For backward compatibility with non-array responses
+          const dataId = response.data.id || response.data.timestamp;
+          
+          // Only process if we haven't processed this exact data point before
+          if (dataId !== lastProcessedDataId.value) {
+            console.log('New data detected, processing...');
+            lastProcessedDataId.value = dataId;
+            
+            processLiveData(response.data);
+          } else {
+            console.log('Skipping duplicate data point with ID:', dataId);
+          }
         }
       } else {
         console.warn('Received empty response from server');
@@ -978,7 +1187,7 @@ const startDataPolling = () => {
 };
 
 // Add function to process live data
-const processLiveData = (data) => {
+const processLiveData = (data, customId = null) => {
   try {
     if (!data) return;
     
@@ -1024,44 +1233,47 @@ const processLiveData = (data) => {
         !isNaN(longitude) && !isNaN(latitude) && 
         longitude !== null && latitude !== null) {
         
-      // Update the latest marker position
-      latestMarkerPosition.value = {
-        longitude,
-        latitude,
-        height: height || 0
-      };
-      
       // Generate a unique marker ID
-      const markerId = 'livedata_' + Date.now();
+      const markerId = customId || 'livedata_' + Date.now();
       
-      // Update or create marker
+      // Create new marker
       const newMarker = {
         id: markerId,
         longitude,
         latitude,
         height: height || 0,
-        timestamp: Date.now()
+        timestamp: data.timestamp || Date.now()
       };
       
       // Update markers list
       if (!allMarkers.value) allMarkers.value = [];
       
-      // Remove previous live data markers to avoid cluttering
-      allMarkers.value = allMarkers.value.filter(marker => !marker.id.includes('livedata_'));
+      // If this is a real-time data point (not from history)
+      if (!customId) {
+        // Update the latest marker position
+        latestMarkerPosition.value = {
+          longitude,
+          latitude,
+          height: height || 0
+        };
+        
+        // Remove previous live data markers to avoid cluttering
+        allMarkers.value = allMarkers.value.filter(marker => !marker.id.includes('livedata_'));
+        
+        // Update localStorage for other components
+        localStorage.setItem('allMarkers', JSON.stringify(allMarkers.value));
+        
+        // Also update kristupasMarkerPosition for backward compatibility
+        localStorage.setItem('kristupasMarkerPosition', JSON.stringify({
+          longitude,
+          latitude,
+          height: height || 0,
+          timestamp: Date.now()
+        }));
+      }
       
       // Add new marker
       allMarkers.value.push(newMarker);
-      
-      // Update localStorage for other components
-      localStorage.setItem('allMarkers', JSON.stringify(allMarkers.value));
-      
-      // Also update kristupasMarkerPosition for backward compatibility
-      localStorage.setItem('kristupasMarkerPosition', JSON.stringify({
-        longitude,
-        latitude,
-        height: height || 0,
-        timestamp: Date.now()
-      }));
       
       // Update the marker on the map if viewer exists
       if (viewer) {
@@ -1094,6 +1306,150 @@ const addCameraChangeListener = () => {
     if (now - lastSampleTime > SAMPLE_THROTTLE_MS && currentLocation.value === 'default') {
       lastSampleTime = now;
       sampleTerrainForOffset();
+    }
+  });
+};
+
+
+
+// Function to process all history data
+const processAllHistoryData = (dataArray) => {
+  try {
+    if (!Array.isArray(dataArray) || dataArray.length === 0) return;
+    
+    console.log(`Processing ${dataArray.length} history data points`);
+    
+    // Parse all data points
+    const parsedData = dataArray.map(dataPoint => {
+      // Extract values from the data string
+      let temperature = null;
+      let humidity = null;
+      let pressure = null;
+      let altitude = null;
+      let latitude = null;
+      let longitude = null;
+      let timestamp = dataPoint.timestamp || Date.now();
+      
+      // Parse the data format from the backend
+      if (dataPoint.data && typeof dataPoint.data === 'string') {
+        console.log('Processing data string:', dataPoint.data);
+        const pairs = dataPoint.data.split(',');
+        
+        // Go through each pair to extract values
+        pairs.forEach(pair => {
+          if (!pair || !pair.includes(':')) return;
+          const [key, value] = pair.split(':').map(s => s.trim());
+          
+          switch(key) {
+            case 'Temp': 
+              temperature = value === 'nan' ? null : parseFloat(value); 
+              break;
+            case 'Humidity': 
+              humidity = value === 'nan' ? null : parseFloat(value); 
+              break;
+            case 'Pressure': 
+              pressure = value === 'nan' ? null : parseFloat(value); 
+              break;
+            case 'Altitude': 
+              altitude = value === 'nan' ? null : parseFloat(value); 
+              break;
+            case 'Lat': 
+              latitude = value === 'nan' ? null : parseFloat(value); 
+              break;
+            case 'Lng': 
+              longitude = value === 'nan' ? null : parseFloat(value); 
+              break;
+          }
+        });
+      }
+      
+      return {
+        temperature,
+        humidity,
+        pressure,
+        altitude,
+        latitude,
+        longitude,
+        timestamp,
+        rawData: dataPoint.data
+      };
+    });
+    
+    // Filter out entries with missing key data
+    const validData = parsedData.filter(entry => 
+      entry.temperature !== null || entry.humidity !== null || 
+      entry.pressure !== null || entry.altitude !== null
+    );
+    
+    if (validData.length === 0) {
+      console.warn('No valid data points found after parsing');
+      return;
+    }
+    
+    // Update history data
+    historyData.value = validData;
+    console.log(`Updated history data with ${validData.length} valid points`);
+    
+    // Process all points for map display
+    if (validData.length > 0) {
+      // Clear previous markers first
+      allMarkers.value = [];
+      
+      // Process each data point
+      dataArray.forEach((dataPoint, index) => {
+        processLiveData(dataPoint, `history_${index}`);
+      });
+      
+      // Update localStorage with all markers
+      localStorage.setItem('allMarkers', JSON.stringify(allMarkers.value));
+    }
+  } catch (err) {
+    console.error('Error processing history data:', err);
+  }
+};
+
+// Add function to update all marker sizes
+const updateAllMarkerSizes = () => {
+  if (!viewer) return;
+  
+  // Update all existing markers with new scale
+  viewer.entities.values.forEach(entity => {
+    if (entity.billboard) {
+      // Apply appropriate scaling based on marker type
+      const isHistory = entity.id && entity.id.includes && entity.id.includes('history_');
+      const isLatest = entity.billboard.image && entity.billboard.image._value === '/canfusion_logo.png';
+      
+      if (isLatest) {
+        entity.billboard.scale = markerScale.value;
+      } else if (isHistory) {
+        entity.billboard.scale = markerScale.value * 0.7; // Keep history markers smaller
+      } else {
+        entity.billboard.scale = markerScale.value;
+      }
+    }
+  });
+};
+
+// Add function to update all label sizes
+const updateAllLabelSizes = () => {
+  if (!viewer) return;
+  
+  // Update all existing labels with new scale
+  viewer.entities.values.forEach(entity => {
+    if (entity.label) {
+      // Get the base font size (12pt for height labels, 14pt for KTU)
+      const currentFont = entity.label.font._value;
+      const fontMatches = currentFont.match(/(\d+)(pt|px) (.*)/);
+      
+      if (fontMatches && fontMatches.length >= 4) {
+        const baseFontSize = parseInt(fontMatches[1]);
+        const fontUnit = fontMatches[2]; // pt or px
+        const fontFamily = fontMatches[3]; // sans-serif, etc.
+        
+        // Calculate new font size based on base size and scale
+        const newSize = Math.round(baseFontSize * labelScale.value);
+        entity.label.font = `${newSize}${fontUnit} ${fontFamily}`;
+      }
     }
   });
 };
@@ -1151,6 +1507,11 @@ onMounted(async () => {
         terrainShadows: Cesium.ShadowMode.DISABLED,
         shadows: false
       });
+
+      // Allow scripts in the InfoBox iframe to prevent sandbox errors
+      if (viewer.infoBox) {
+        viewer.infoBox.viewModel.frameSandbox = viewer.infoBox.viewModel.frameSandbox + " allow-scripts";
+      }
 
       initializeCamera(Cesium);
       
@@ -1236,9 +1597,7 @@ onMounted(async () => {
         setBuildingStyle(buildingTileset);
       }
 
-      // Start refresh timer
-      refreshTimer = setInterval(saveCameraState, refreshInterval);
-
+      // (Auto-refresh removed per user request)
       // Restore camera position if available
       restoreCameraState();
       
@@ -1353,24 +1712,24 @@ const addKtuMarker = (Cesium, viewer) => {
           point: {
             pixelSize: 10,
             color: Cesium.Color.BLUE,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY // Always show regardless of buildings
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
           },
           label: {
             text: 'KTU',
-            font: '14pt sans-serif',
-            disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always show regardless of buildings
-            pixelOffset: new Cesium.Cartesian2(0, -20), // Offset label to appear above point
+            font: `${Math.round(14 * labelScale.value)}pt sans-serif`,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            pixelOffset: new Cesium.Cartesian2(0, -20),
             fillColor: Cesium.Color.WHITE,
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE
           },
           billboard: {
-            image: '/marker.png', // Use a marker image for better visibility
+            image: '/marker.png',
             width: 32,
             height: 44,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY // Always show regardless of buildings
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
           }
         });
       }
@@ -1388,6 +1747,7 @@ const addKtuMarker = (Cesium, viewer) => {
 .track-page {
   width: 100%;
   height: 100vh;
+  height: 100dvh; /* Use dynamic viewport height for mobile */
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -1407,11 +1767,11 @@ const addKtuMarker = (Cesium, viewer) => {
 
 .track-nav {
   position: absolute;
-  top: 20px;
-  left: 20px;
+  top: 10px;
+  left: 10px;
   z-index: 999;
   background-color: rgba(0, 0, 0, 0.7);
-  padding: 12px 18px;
+  padding: 8px 12px;
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
@@ -1420,11 +1780,12 @@ const addKtuMarker = (Cesium, viewer) => {
   color: white;
   text-decoration: none;
   font-family: 'Orbitron', sans-serif;
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 500;
   display: flex;
   align-items: center;
   transition: color 0.2s;
+  padding: 5px;
 }
 
 .back-link:hover {
@@ -1528,10 +1889,10 @@ const addKtuMarker = (Cesium, viewer) => {
   background-color: #1e293b;
   color: white;
   border: none;
-  padding: 8px 16px;
+  padding: 8px 10px;
   border-radius: 4px;
   font-family: 'Orbitron', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s;
   will-change: transform;
@@ -1545,5 +1906,133 @@ const addKtuMarker = (Cesium, viewer) => {
 .control-btn.disabled {
   opacity: 0.5;
   pointer-events: none;
+}
+
+/* Add marker size slider styling */
+.slider-control {
+  display: flex;
+  flex-direction: column;
+  margin-top: 5px;
+}
+
+.slider-control label {
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+  margin-bottom: 5px;
+}
+
+.slider-control input {
+  width: 100%;
+  accent-color: #2563eb;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .location-selector {
+    bottom: 10px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 90%;
+    max-width: 400px;
+  }
+  
+  .location-btn {
+    padding: 10px 14px; /* Larger touch target */
+    min-width: 80px; /* Minimum width for better touch */
+    margin: 2px;
+  }
+  
+  .controls-panel {
+    top: auto;
+    right: auto;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 90%;
+    max-width: 400px;
+  }
+  
+  .control-btn {
+    padding: 10px 14px; /* Larger touch target */
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+  }
+  
+  .slider-control {
+    width: 100%;
+    margin-top: 10px;
+  }
+  
+  /* Ensure Cesium toolbar buttons are usable on mobile */
+  .cesium-viewer-toolbar {
+    right: 10px !important;
+  }
+  
+  .cesium-button {
+    margin: 0 3px !important;
+    padding: 3px !important;
+  }
+  
+  /* Make the back button more visible/accessible */
+  .track-nav {
+    top: 10px;
+    left: 10px;
+    padding: 8px 12px;
+  }
+  
+  .back-link {
+    font-size: 1rem;
+    padding: 5px;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .location-selector {
+    bottom: 5px;
+    padding: 6px 8px;
+  }
+  
+  .location-btn {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    min-width: 70px;
+  }
+  
+  .controls-panel {
+    bottom: 70px;
+    padding: 8px;
+  }
+  
+  .control-btn {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    min-width: 100px;
+  }
+  
+  .slider-control {
+    width: 100%;
+    margin-top: 10px;
+  }
+  
+  /* Adjust Cesium navigation controls for very small screens */
+  .cesium-navigation-help {
+    max-width: 90vw !important;
+    right: 5px !important;
+  }
+}
+
+/* Fix for touch devices */
+@media (hover: none) {
+  .control-btn:active,
+  .location-btn:active {
+    background-color: #2563eb;
+  }
 }
 </style>
