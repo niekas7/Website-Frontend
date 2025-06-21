@@ -39,20 +39,6 @@
           @input="updateAllMarkerSizes"
         />
       </div>
-      
-      <!-- Add label size slider -->
-      <div class="slider-control">
-        <label for="label-size">Label Size:</label>
-        <input 
-          type="range" 
-          id="label-size" 
-          v-model="labelScale" 
-          min="0.7" 
-          max="2.0" 
-          step="0.1"
-          @input="updateAllLabelSizes"
-        />
-      </div>
     </div>
     
     <!-- Add loading/error message -->
@@ -105,8 +91,6 @@ const historyData = ref([]);
 
 // Add state for marker scaling
 const markerScale = ref(1.0); // Default marker scale
-// Add state for label scaling
-const labelScale = ref(1.0); // Default label scale
 
 // Server URL configuration
 const availableServers = [
@@ -835,13 +819,13 @@ const loadAllMarkers = (Cesium, viewer) => {
               position: position,
               label: {
                 text: `${Math.round(height)}m`,
-                font: `${Math.round(12 * labelScale.value)}pt sans-serif`,
+                font: '12pt sans-serif',
                 fillColor: Cesium.Color.WHITE,
                 outlineColor: Cesium.Color.BLACK,
                 outlineWidth: 2,
                 style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                verticalOrigin: Cesium.VerticalOrigin.TOP,
-                pixelOffset: new Cesium.Cartesian2(0, 5),
+                verticalOrigin: Cesium.VerticalOrigin.TOP, // Position label below the marker's bottom
+                pixelOffset: new Cesium.Cartesian2(0, 5), // Offset further down
                 disableDepthTestDistance: Number.POSITIVE_INFINITY
               }
             });
@@ -919,13 +903,13 @@ const addSingleMarker = (Cesium, viewer, markerData) => {
         position: position,
         label: {
           text: `${Math.round(height)}m`,
-          font: `${Math.round(12 * labelScale.value)}pt sans-serif`,
+          font: '12pt sans-serif',
           fillColor: Cesium.Color.WHITE,
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          verticalOrigin: Cesium.VerticalOrigin.TOP,
-          pixelOffset: new Cesium.Cartesian2(0, 5),
+          verticalOrigin: Cesium.VerticalOrigin.TOP, // Position label below the marker's bottom
+          pixelOffset: new Cesium.Cartesian2(0, 5), // Offset further down
           disableDepthTestDistance: Number.POSITIVE_INFINITY
         }
       });
@@ -1055,13 +1039,13 @@ const updateMarker = (Cesium, viewer, markerData) => {
       position: position,
       label: {
         text: `${Math.round(height)}m`,
-        font: `${Math.round(12 * labelScale.value)}pt sans-serif`,
+        font: '12pt sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.TOP,
-        pixelOffset: new Cesium.Cartesian2(0, 5),
+        verticalOrigin: Cesium.VerticalOrigin.TOP, // Position label below the marker's bottom
+        pixelOffset: new Cesium.Cartesian2(0, 5), // Offset further down
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       }
     });
@@ -1430,30 +1414,6 @@ const updateAllMarkerSizes = () => {
   });
 };
 
-// Add function to update all label sizes
-const updateAllLabelSizes = () => {
-  if (!viewer) return;
-  
-  // Update all existing labels with new scale
-  viewer.entities.values.forEach(entity => {
-    if (entity.label) {
-      // Get the base font size (12pt for height labels, 14pt for KTU)
-      const currentFont = entity.label.font._value;
-      const fontMatches = currentFont.match(/(\d+)(pt|px) (.*)/);
-      
-      if (fontMatches && fontMatches.length >= 4) {
-        const baseFontSize = parseInt(fontMatches[1]);
-        const fontUnit = fontMatches[2]; // pt or px
-        const fontFamily = fontMatches[3]; // sans-serif, etc.
-        
-        // Calculate new font size based on base size and scale
-        const newSize = Math.round(baseFontSize * labelScale.value);
-        entity.label.font = `${newSize}${fontUnit} ${fontFamily}`;
-      }
-    }
-  });
-};
-
 // Modified onMounted function
 onMounted(async () => {
   try {
@@ -1712,24 +1672,24 @@ const addKtuMarker = (Cesium, viewer) => {
           point: {
             pixelSize: 10,
             color: Cesium.Color.BLUE,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY
+            disableDepthTestDistance: Number.POSITIVE_INFINITY // Always show regardless of buildings
           },
           label: {
             text: 'KTU',
-            font: `${Math.round(14 * labelScale.value)}pt sans-serif`,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            pixelOffset: new Cesium.Cartesian2(0, -20),
+            font: '14pt sans-serif',
+            disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always show regardless of buildings
+            pixelOffset: new Cesium.Cartesian2(0, -20), // Offset label to appear above point
             fillColor: Cesium.Color.WHITE,
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE
           },
           billboard: {
-            image: '/marker.png',
+            image: '/marker.png', // Use a marker image for better visibility
             width: 32,
             height: 44,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY
+            disableDepthTestDistance: Number.POSITIVE_INFINITY // Always show regardless of buildings
           }
         });
       }
